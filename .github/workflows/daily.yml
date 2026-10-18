@@ -1,0 +1,36 @@
+name: Daily run (after the close)
+# Books today's paper fills at the real closing prices and updates the dashboard.
+# Two UTC times cover both DST offsets; the engine ignores today's prices until 4:15 PM ET
+# and a second run on the same day changes nothing, so running twice is safe.
+on:
+  schedule:
+    - cron: "20 20 * * 1-5"   # 4:20 PM EDT (3:20 PM EST: too early, no-op)
+    - cron: "20 21 * * 1-5"   # 4:20 PM EST (5:20 PM EDT: already done, no-op)
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: twin-engine
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Run engine
+        run: |
+          if [ ! -f state.json ]; then echo "::error::No account yet. Run the 'Start account' workflow first."; exit 1; fi
+          python twin_engine.py run | tee run.log
+          { echo '```'; cat run.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Save results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state.json summary.json
+          if git diff --cached --quiet state.json; then echo "No new close booked."; exit 0; fi
+          git commit -m "Daily run $(TZ=America/New_York date +%F)"; git pull --rebase; git push

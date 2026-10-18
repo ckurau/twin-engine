@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+_old_v1.0/
+validation/
+*.tmp
+preview.md

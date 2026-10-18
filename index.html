@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}[hidden]{display:none!important}img{max-width:100%}</style>
+</head><body>
+<title>Twin Engine</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#0d1422">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Twin Engine">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: instrument cluster — sticky value header, two "engine" gauges, then detail; bottom tab bar on phones, top tabs on wide screens */
+:root{
+  --bg:#0d1422; --bg2:#121b2c; --card:#162034; --card2:#1c2840; --line:#26324a; --line2:#33415e;
+  --fg:#e8edf6; --fg2:#a9b4c9; --fg3:#75829b;
+  --e1:#5b8cff;  --e1-soft:rgba(91,140,255,.16);   /* engine 1: Modified 9Sig */
+  --e2:#f0a63a;  --e2-soft:rgba(240,166,58,.16);   /* engine 2: LDS */
+  --up:#34c38f; --up-soft:rgba(52,195,143,.14); --dn:#f2555a; --dn-soft:rgba(242,85,90,.14); --warn:#f5c451;
+  --spy:#8d99b3;
+  --shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 10px 30px -18px rgba(0,0,0,.6);
+  --f-display:"Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-body:"Instrument Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-data:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r:14px; color-scheme:dark;
+}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){
+  --bg:#eef1f6; --bg2:#e6eaf1; --card:#ffffff; --card2:#f5f7fb; --line:#dde3ec; --line2:#c9d1de;
+  --fg:#111a2b; --fg2:#4a5770; --fg3:#7a869c;
+  --e1:#2f62e6; --e1-soft:rgba(47,98,230,.10); --e2:#c97a0a; --e2-soft:rgba(201,122,10,.11);
+  --up:#11865a; --up-soft:rgba(17,134,90,.10); --dn:#d1343a; --dn-soft:rgba(209,52,58,.09); --warn:#a87500; --spy:#7b879e;
+  --shadow:0 1px 2px rgba(17,26,43,.05), 0 8px 24px -16px rgba(17,26,43,.25); color-scheme:light}}
+:root[data-theme="light"]{
+  --bg:#eef1f6; --bg2:#e6eaf1; --card:#ffffff; --card2:#f5f7fb; --line:#dde3ec; --line2:#c9d1de;
+  --fg:#111a2b; --fg2:#4a5770; --fg3:#7a869c;
+  --e1:#2f62e6; --e1-soft:rgba(47,98,230,.10); --e2:#c97a0a; --e2-soft:rgba(201,122,10,.11);
+  --up:#11865a; --up-soft:rgba(17,134,90,.10); --dn:#d1343a; --dn-soft:rgba(209,52,58,.09); --warn:#a87500; --spy:#7b879e;
+  --shadow:0 1px 2px rgba(17,26,43,.05), 0 8px 24px -16px rgba(17,26,43,.25); color-scheme:light}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--f-body);min-height:100vh;
+  padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px));
+  padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bg)}
+.wrap{max-width:1080px;margin:0 auto}
+.num{font-family:var(--f-data);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.up{color:var(--up)} .dn{color:var(--dn)} .muted{color:var(--fg3)} .fg2{color:var(--fg2)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--e1);outline-offset:2px;border-radius:6px}
+
+/* header */
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:linear-gradient(var(--bg) 78%, transparent);padding-block:14px 10px;margin-inline:calc(-1*max(16px, env(safe-area-inset-left,0px)));padding-inline:max(16px, env(safe-area-inset-left,0px))}
+.hdr{max-width:1080px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.logo{display:flex;align-items:center;gap:9px;min-width:0}
+.logo svg{flex:none}
+.logo b{font:800 18px/1 var(--f-display);letter-spacing:-.02em;white-space:nowrap}
+.logo small{display:block;font:500 11px/1.2 var(--f-body);color:var(--fg3);letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
+.hdr .sp{flex:1}
+.hval{text-align:right;line-height:1.1}
+.hval .v{font:600 17px var(--f-data);font-variant-numeric:tabular-nums}
+.hval .d{font:500 12px var(--f-data);white-space:nowrap}
+.badge{font:600 10.5px/1 var(--f-body);letter-spacing:.08em;text-transform:uppercase;padding:5px 8px;border-radius:999px;border:1px solid var(--line2);color:var(--fg2);white-space:nowrap}
+.badge.demo{border-color:var(--warn);color:var(--warn)}
+.badge.live{border-color:var(--up);color:var(--up)}
+
+/* tabs */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:25;background:color-mix(in srgb, var(--bg2) 92%, transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);
+  padding:6px max(10px, env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(10px, env(safe-area-inset-left,0px));display:flex;justify-content:space-around}
+nav.tabs button{background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 8px;border-radius:10px;font:600 10.5px var(--f-body);letter-spacing:.04em;color:var(--fg3);min-width:58px;cursor:pointer}
+nav.tabs button svg{width:22px;height:22px}
+nav.tabs button[aria-selected="true"]{color:var(--fg)}
+nav.tabs button[aria-selected="true"] svg{color:var(--e1)}
+@media (min-width:860px){
+  body{padding-bottom:40px}
+  nav.tabs{position:static;background:none;backdrop-filter:none;border:0;justify-content:flex-start;gap:4px;padding:0;max-width:1080px;margin:4px auto 18px}
+  nav.tabs button{flex-direction:row;font-size:13px;letter-spacing:0;padding:8px 14px;background:var(--card);border:1px solid var(--line)}
+  nav.tabs button svg{width:17px;height:17px}
+  nav.tabs button[aria-selected="true"]{background:var(--card2);border-color:var(--line2)}
+}
+
+/* generic */
+section.tab{scroll-margin-top:120px;display:flex;flex-direction:column;gap:14px;animation:fade .25s ease}
+@keyframes fade{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){section.tab{animation:none}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);min-width:0}
+.h2{font:700 13px var(--f-body);letter-spacing:.09em;text-transform:uppercase;color:var(--fg3);margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.h2 .r{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:640px){.grid2{grid-template-columns:1fr}}
+.pill{display:inline-flex;align-items:center;gap:5px;font:600 11px/1 var(--f-body);letter-spacing:.04em;padding:5px 8px;border-radius:999px;white-space:nowrap}
+.pill.e1{background:var(--e1-soft);color:var(--e1)} .pill.e2{background:var(--e2-soft);color:var(--e2)}
+.pill.up{background:var(--up-soft);color:var(--up)} .pill.dn{background:var(--dn-soft);color:var(--dn)}
+.pill.neutral{background:var(--card2);color:var(--fg2);border:1px solid var(--line)}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block}
+
+/* hero */
+.hero{padding:20px 18px 14px;background:
+  radial-gradient(120% 90% at 0% 0%, var(--e1-soft), transparent 60%),
+  radial-gradient(120% 90% at 100% 0%, var(--e2-soft), transparent 60%), var(--card)}
+.hero .lab{font:600 12px var(--f-body);letter-spacing:.09em;text-transform:uppercase;color:var(--fg3)}
+.hero .big{font:700 clamp(36px, 10vw, 54px)/1.05 var(--f-data);letter-spacing:-.03em;font-variant-numeric:tabular-nums;margin:6px 0 8px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border-radius:12px;overflow:hidden;margin-top:16px;border:1px solid var(--line)}
+.kpi{background:var(--card);padding:10px 12px;min-width:0}
+.kpi .k{font:600 10.5px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--fg3);white-space:nowrap}
+.kpi .v{font:600 16px var(--f-data);font-variant-numeric:tabular-nums;margin-top:2px;white-space:nowrap}
+.kpi .s{font:12px var(--f-body);color:var(--fg3)}
+@media (max-width:520px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* engines */
+.engine{position:relative;overflow:hidden}
+.engine .ttl{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.engine .ttl b{font:700 17px var(--f-display);letter-spacing:-.01em}
+.engine .val{font:600 22px var(--f-data);font-variant-numeric:tabular-nums;margin:4px 0 10px}
+.engine.e1{border-top:3px solid var(--e1)} .engine.e2{border-top:3px solid var(--e2)}
+.meter{height:8px;border-radius:999px;background:var(--card2);overflow:hidden;border:1px solid var(--line)}
+.meter i{display:block;height:100%;border-radius:999px}
+.rows{display:flex;flex-direction:column;gap:7px;margin-top:12px}
+.row{display:flex;justify-content:space-between;gap:10px;font-size:13.5px}
+.row span:first-child{color:var(--fg2)}
+.row span:last-child{font-family:var(--f-data);font-variant-numeric:tabular-nums;text-align:right}
+
+/* chart */
+.seg{display:inline-flex;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:2px}
+.seg button{border:0;background:none;padding:5px 9px;border-radius:8px;font:600 12px var(--f-body);color:var(--fg3);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--fg);box-shadow:var(--shadow)}
+.chartbox{position:relative;width:100%}
+.chartbox svg{display:block;width:100%;height:auto;overflow:visible}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--fg2);margin-top:8px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.tip{position:absolute;pointer-events:none;background:var(--card2);border:1px solid var(--line2);border-radius:10px;padding:8px 10px;font:12px var(--f-data);box-shadow:var(--shadow);white-space:nowrap;transform:translate(-50%,-110%)}
+
+/* lists */
+.list{display:flex;flex-direction:column}
+.li{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-top:1px solid var(--line)}
+.li:first-child{border-top:0;padding-top:2px}
+.li .when{font:600 12px var(--f-data);color:var(--fg2);min-width:58px;padding-top:1px}
+.li .what{flex:1;min-width:0;font-size:14px}
+
+/* positions */
+.sleevehdr{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:6px 2px -2px}
+.sleevehdr b{font:700 18px var(--f-display)}
+.sleevehdr .num{margin-left:auto;color:var(--fg2);font-size:13.5px;white-space:nowrap}
+.pos{padding:0;overflow:hidden}
+.pos .top{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:14px 16px}
+.tk{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;font:700 12px var(--f-data);letter-spacing:.02em}
+.tk.e1{background:var(--e1-soft);color:var(--e1)} .tk.e2{background:var(--e2-soft);color:var(--e2)}
+.pos .nm b{font:700 17px var(--f-display);letter-spacing:-.01em}
+.pos .nm div{font-size:12.5px;color:var(--fg3)}
+.pos .pl{text-align:right}
+.pos .pl .v{font:600 16px var(--f-data);font-variant-numeric:tabular-nums}
+.pos .pl .p{font:600 12.5px var(--f-data)}
+.facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--line)}
+.fact{padding:10px 16px;border-left:1px solid var(--line);min-width:0}
+.fact:first-child{border-left:0}
+.fact .k{font:600 10.5px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--fg3);white-space:nowrap}
+.fact .v{font:500 14px var(--f-data);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:560px){.facts{grid-template-columns:repeat(2,minmax(0,1fr))}.fact:nth-child(3){border-left:0}.fact:nth-child(n+3){border-top:1px solid var(--line)}}
+.why{display:flex;gap:10px;padding:12px 16px;background:var(--card2);border-top:1px solid var(--line);font-size:13.5px;line-height:1.5}
+.why .ic{flex:none;width:20px;height:20px;margin-top:1px}
+.why b{font-weight:600}
+.exitrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 16px;border-top:1px solid var(--line)}
+details.lots{border-top:1px solid var(--line)}
+details.lots summary{cursor:pointer;padding:10px 16px;font:600 12.5px var(--f-body);color:var(--fg2);list-style:none;display:flex;align-items:center;gap:8px}
+details.lots summary::-webkit-details-marker{display:none}
+details.lots summary::after{content:"";width:7px;height:7px;border-right:2px solid var(--fg3);border-bottom:2px solid var(--fg3);transform:rotate(45deg);margin-left:auto;transition:transform .2s}
+details.lots[open] summary::after{transform:rotate(-135deg)}
+.tblwrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{font:600 10.5px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--fg3);text-align:right;padding:8px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:right;font-family:var(--f-data);font-variant-numeric:tabular-nums;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+tr:last-child td{border-bottom:0}
+.wbar{height:4px;background:var(--card2);border-radius:999px;overflow:hidden;margin-top:6px}
+.wbar i{display:block;height:100%}
+
+/* trades */
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chip{border:1px solid var(--line2);background:var(--card);border-radius:999px;padding:6px 12px;font:600 12.5px var(--f-body);color:var(--fg2);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+input.search{flex:1;min-width:120px;background:var(--card);border:1px solid var(--line2);border-radius:999px;padding:7px 12px;font:14px var(--f-body);color:var(--fg)}
+.daygrp{font:700 12px var(--f-data);color:var(--fg3);letter-spacing:.04em;margin:8px 2px 4px;display:flex;gap:8px}
+.tr{display:grid;grid-template-columns:auto 1fr auto;gap:10px 12px;align-items:center;padding:12px 14px;border-top:1px solid var(--line)}
+.tr:first-child{border-top:0}
+.side{font:700 10.5px var(--f-body);letter-spacing:.08em;padding:5px 7px;border-radius:7px;text-align:center;min-width:44px}
+.side.BUY{background:var(--up-soft);color:var(--up)} .side.SELL{background:var(--dn-soft);color:var(--dn)}
+.tr .m b{font:700 15px var(--f-display)} .tr .m span{font:13px var(--f-data);color:var(--fg2)}
+.tr .m .rs{font:12.5px var(--f-body);color:var(--fg3);margin-top:2px}
+.tr .r{text-align:right;font-family:var(--f-data);font-variant-numeric:tabular-nums;font-size:14px}
+.tr .r small{display:block;font-size:12px}
+.more{display:block;margin:10px auto 0;background:var(--card2);border:1px solid var(--line2);border-radius:999px;padding:8px 16px;font:600 13px var(--f-body);cursor:pointer}
+
+/* signals */
+.gauge{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.gauge svg{width:200px;max-width:100%;height:auto;flex:none}
+.gauge .txt{flex:1;min-width:180px}
+.bigpct{font:700 34px var(--f-data);letter-spacing:-.02em}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:6px}
+.cal .d{aspect-ratio:1;max-width:100%;border-radius:8px;display:grid;place-items:center;font:500 12px var(--f-data);color:var(--fg3);background:var(--card2);border:1px solid transparent}
+.cal .d.trade{color:var(--fg)} .cal .d.tom{background:var(--e1-soft);color:var(--e1);border-color:var(--e1);font-weight:700}
+.cal .d.today{outline:2px solid var(--fg);outline-offset:-2px} .cal .d.blank{background:none}
+.cal .w{font:600 10px var(--f-body);color:var(--fg3);text-align:center;letter-spacing:.06em}
+.asset{display:grid;grid-template-columns:52px 1fr auto;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.asset:first-child{border-top:0}
+.asset .sym{font:700 15px var(--f-display)}
+.track{position:relative;height:8px;border-radius:999px;background:var(--card2);border:1px solid var(--line)}
+.track .mid{position:absolute;left:50%;top:-4px;bottom:-4px;width:2px;background:var(--fg3);border-radius:2px}
+.track .mk{position:absolute;top:50%;width:12px;height:12px;border-radius:50%;transform:translate(-50%,-50%);border:2px solid var(--card)}
+.asset .sub{font-size:12px;color:var(--fg3);margin-top:6px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.qbar{position:relative;height:12px;border-radius:999px;background:var(--card2);border:1px solid var(--line);margin:10px 0 6px}
+.qbar i{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:var(--e1)}
+.qbar b{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--fg)}
+
+/* strategy */
+.prose{max-width:68ch;font-size:15px;line-height:1.6}
+.prose h3{font:700 18px var(--f-display);margin:18px 0 6px;letter-spacing:-.01em;text-wrap:balance}
+.prose h3:first-child{margin-top:0}
+.prose p{margin:0 0 10px;color:var(--fg2)}
+.prose ul{margin:0 0 10px;padding-left:20px;color:var(--fg2)} .prose li{margin:3px 0}
+.prose b{color:var(--fg)}
+.foot{font-size:12px;color:var(--fg3);text-align:center;padding:18px 0 4px}
+.empty{color:var(--fg3);font-size:14px;padding:6px 0}
+</style>
+
+<header class="top">
+  <div class="hdr">
+    <div class="logo">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><circle cx="12" cy="17" r="9" fill="none" stroke="var(--e1)" stroke-width="3"/><circle cx="22" cy="17" r="9" fill="none" stroke="var(--e2)" stroke-width="3"/></svg>
+      <div><b>Twin Engine</b><small id="asof">Loading…</small></div>
+    </div>
+    <span id="modeBadge" class="badge">Paper</span>
+    <div class="sp"></div>
+    <div class="hval"><div class="v" id="hv">—</div><div class="d" id="hd">—</div></div>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Sections">
+  <button role="tab" id="t-overview" aria-selected="true" data-tab="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>Overview</button>
+  <button role="tab" id="t-positions" aria-selected="false" data-tab="positions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/></svg>Positions</button>
+  <button role="tab" id="t-trades" aria-selected="false" data-tab="trades"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></svg>Trades</button>
+  <button role="tab" id="t-signals" aria-selected="false" data-tab="signals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-6"/></svg>Signals</button>
+  <button role="tab" id="t-strategy" aria-selected="false" data-tab="strategy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7M9 8h3"/></svg>Strategy</button>
+</nav>
+
+<main class="wrap">
+  <section class="tab" id="overview" role="tabpanel" aria-labelledby="t-overview"></section>
+  <section class="tab" id="positions" role="tabpanel" aria-labelledby="t-positions" hidden></section>
+  <section class="tab" id="trades" role="tabpanel" aria-labelledby="t-trades" hidden></section>
+  <section class="tab" id="signals" role="tabpanel" aria-labelledby="t-signals" hidden></section>
+  <section class="tab" id="strategy" role="tabpanel" aria-labelledby="t-strategy" hidden></section>
+  <div class="foot" id="foot"></div>
+</main>
+
+<script>
+(function(){
+"use strict";
+let D = null, PV = null, tradeFilter = {side:"ALL", sleeve:"ALL", q:""}, tradeLimit = 60, range = "ALL";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const money = (v, d) => v == null ? "—" : (v < 0 ? "−" : "") + "$" + Math.abs(v).toLocaleString("en-US", {minimumFractionDigits: d ?? (Math.abs(v) < 1000 ? 2 : 0), maximumFractionDigits: d ?? (Math.abs(v) < 1000 ? 2 : 0)});
+const smoney = v => v == null ? "—" : (v > 0 ? "+" : v < 0 ? "−" : "") + "$" + Math.abs(v).toLocaleString("en-US", {minimumFractionDigits: Math.abs(v) < 1000 ? 2 : 0, maximumFractionDigits: Math.abs(v) < 1000 ? 2 : 0});
+const pct = (v, d=1) => v == null ? "—" : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(d) + "%";
+const cls = v => v > 0 ? "up" : v < 0 ? "dn" : "";
+const px = v => v == null ? "—" : "$" + v.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const dfmt = (s, o) => { if (!s) return "—"; const d = new Date(s + "T12:00:00"); return d.toLocaleDateString("en-US", o || {month: "short", day: "numeric"}); };
+const dlong = s => dfmt(s, {weekday: "short", month: "short", day: "numeric"});
+const daysTo = s => { const a = new Date(D.meta.as_of + "T12:00:00"), b = new Date(s + "T12:00:00"); return Math.round((b - a) / 864e5); };
+const sleeveName = s => s === "9SIG" ? "Modified 9Sig" : s === "LDS" ? "LDS" : s;
+const sleeveCls = s => s === "9SIG" ? "e1" : "e2";
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+async function load(){
+  try {
+    const r = await fetch("preview.json?t=" + Date.now(), {cache: "no-store"});
+    PV = r.ok ? await r.json() : null;
+  } catch (e) { PV = null; }
+  try {
+    const r = await fetch("summary.json?t=" + Date.now(), {cache: "no-store"});
+    if (!r.ok) throw 0;
+    D = await r.json(); D.__src = "file";
+  } catch (e) { D = null; }
+  if (!D) { renderEmpty(); return; }
+  renderAll();
+}
+
+/* ---------------- today's orders (preview before the close) ---------------- */
+function previewCard(){
+  const today = new Date().toLocaleDateString("en-CA", {timeZone: "America/New_York"});
+  if (!PV || PV.date !== today || PV.status === "closed" || (D && D.meta && D.meta.as_of >= PV.date)) return "";
+  const warn = (PV.warnings || []).map(w => `<div class="muted" style="font-size:12.5px;margin-top:6px">${esc(w)}</div>`).join("");
+  if (!PV.orders.length) return `<div class="card"><div class="h2">Today's orders <span class="r muted">checked ${esc(PV.prices_as_of || "")}</span></div><div class="empty">No orders today. Nothing to place at the close.</div>${warn}</div>`;
+  const close = PV.close_time === "13:00" ? "1:00 PM ET early close" : "4:00 PM ET close";
+  return `<div class="card" style="border-color:var(--warn)">
+    <div class="h2">Place before the close <span class="r"><span class="pill neutral">${PV.orders.length} MOC order${PV.orders.length > 1 ? "s" : ""}</span></span></div>
+    <div class="list">${PV.orders.map(o => `<div class="li"><span class="side ${o.side}">${o.side}</span><div class="what"><b>${esc(o.ticker)}</b> <span class="num fg2">${o.shares.toLocaleString()} sh · ~${px(o.est_price)}</span><div class="muted" style="font-size:12.5px">${o.reasons.map(esc).join("; ")}</div></div><div class="num">~${money(o.est_value, 0)}</div></div>`).join("")}</div>
+    <div class="fg2" style="font-size:13px;margin-top:10px">Market-on-close, before Schwab's MOC cutoff for the ${close}. Prices as of ${esc(PV.prices_as_of || "")}; the daily run after the close books the actual fills.</div>${warn}
+  </div>`;
+}
+
+/* ---------------- before the first run ---------------- */
+const DEFAULT_PARAMS = {fomc_swap: true, split_9sig: .5, sig_rate: .09, vol_target: .8, vol_power: 10, vol_band: .05, vol_lookback: 20, tom_after: 3, sma_days: 210, lds_core: .85, lds_overlay: .15, lds_threshold: .05, slippage_bps: 2};
+function nextCloseLabel(){
+  const now = new Date(), et = new Date(now.toLocaleString("en-US", {timeZone: "America/New_York"}));
+  const d = new Date(et); const afterClose = et.getHours() > 16 || (et.getHours() === 16 && et.getMinutes() >= 15);
+  if (afterClose) d.setDate(d.getDate() + 1);
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  return d.toLocaleDateString("en-US", {weekday: "long", month: "short", day: "numeric"});
+}
+function renderEmpty(){
+  $("#asof").textContent = "Not started";
+  const b = $("#modeBadge"); b.textContent = "Waiting"; b.className = "badge";
+  $("#hv").textContent = "$20,000"; $("#hd").innerHTML = '<span class="muted">starting balance</span>';
+  const day = nextCloseLabel();
+  const step = (n, t, d) => `<div class="li"><div class="when" style="min-width:28px"><span class="pill neutral" style="padding:5px 8px">${n}</span></div><div class="what"><b>${t}</b><div class="fg2" style="font-size:13.5px">${d}</div></div></div>`;
+  $("#overview").innerHTML = previewCard() + `
+  <div class="card hero">
+    <div class="lab">Your paper account</div>
+    <div class="big num">$20,000.00</div>
+    <div class="chips"><span class="pill neutral">Opens at the close · ${esc(day)}</span><span class="pill e1"><span class="dot"></span>50% Modified 9Sig</span><span class="pill e2"><span class="dot"></span>50% LDS</span></div>
+    <p class="fg2" style="margin:14px 0 0;font-size:14px;max-width:60ch">Nothing has been traded yet. Your history starts with the engine's first run after the market closes. That run buys the starting positions at real closing prices, and every trading day after that adds to this page. No simulated or past data is shown here.</p>
+  </div>
+  <div class="card"><div class="h2">Start the account</div><div class="list">
+    ${step(1, "Open the account", "In the GitHub repo: Actions → Start account (once) → Run workflow. It opens the account at the close of the start date (default Fri Oct 16).")}
+    ${step(2, "Nothing else to run", "Every weekday GitHub previews the orders about 45 min before the close and books the real fills after it. This page updates by itself.")}
+    ${step(3, "On your phone", "Open this page and Add to Home Screen. On order days GitHub also opens an issue, so the GitHub app notifies you.")}
+  </div></div>
+  <div class="card"><div class="h2">What you'll see after the first run</div><div class="list">
+    <div class="li"><div class="what fg2">Starting positions in both engines, each with entry date, entry price, current P&L and the exact rule that will make it exit.</div></div>
+    <div class="li"><div class="what fg2">Account value versus the same $20,000 in SPY, drawn from day one.</div></div>
+    <div class="li"><div class="what fg2">Every paper order with its reason, and the next scheduled actions.</div></div>
+  </div></div>`;
+  const none = (t) => `<div class="card empty">${t}</div>`;
+  $("#positions").innerHTML = none("No positions yet. The first run opens them at the close.");
+  $("#trades").innerHTML = none("No trades yet. Your trade history starts with the first run.");
+  $("#signals").innerHTML = none("Signals appear after the first run, using real prices.");
+  D = {params: DEFAULT_PARAMS, meta: {contrib_monthly: 200}}; renderStrategy(); D = null;
+  $("#foot").textContent = "Paper trading only, not financial advice";
+}
+
+function renderAll(){
+  const p = D.portfolio;
+  $("#asof").textContent = "As of close " + dfmt(D.meta.as_of, {weekday: "short", month: "short", day: "numeric", year: "numeric"});
+  const demo = !!D.meta.demo;
+  const b = $("#modeBadge"); b.textContent = demo ? "Demo data" : "Paper"; b.className = "badge " + (demo ? "demo" : "live");
+  $("#hv").textContent = money(p.value, 0);
+  $("#hd").innerHTML = `<span class="${cls(p.day_pl)}">${smoney(p.day_pl)} · ${pct(p.day_pct, 2)}</span>`;
+  renderOverview(); renderPositions(); renderTrades(); renderSignals(); renderStrategy();
+  $("#foot").textContent = "Generated " + (D.meta.generated || "").replace("T", " ") + " · engine v" + D.meta.version + " · paper trading only, not financial advice";
+}
+
+/* ---------------- overview ---------------- */
+function renderOverview(){
+  const p = D.portfolio, n = D.sleeves.nine, l = D.sleeves.lds, eq = D.equity;
+  const spyPL = p.spy_value - p.contributed;
+  const vsSpy = p.value - p.spy_value;
+  const todays = D.trades.filter(t => t.date === D.meta.as_of);
+  $("#overview").innerHTML = previewCard() + `${(D.meta.warnings || []).map(w => `<div class="card" style="border-color:var(--dn)"><b class="dn">Action needed:</b> <span class="fg2">${esc(w)}</span></div>`).join("")}
+  <div class="card hero">
+    <div class="lab">Portfolio value</div>
+    <div class="big num">${money(p.value, 2)}</div>
+    <div class="chips">
+      <span class="pill ${p.day_pl >= 0 ? "up" : "dn"}">Today ${smoney(p.day_pl)} · ${pct(p.day_pct, 2)}</span>
+      <span class="pill ${p.total_pl >= 0 ? "up" : "dn"}">All-time ${smoney(p.total_pl)} · ${pct(p.total_pct)}</span>
+      <span class="pill ${vsSpy >= 0 ? "up" : "dn"}">vs SPY ${smoney(vsSpy)}</span>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><div class="k">Invested</div><div class="v num">${money(p.contributed, 0)}</div><div class="s">since ${dfmt(D.meta.start_date, {month:"short", day:"numeric", year:"numeric"})}</div></div>
+      <div class="kpi"><div class="k">Time-wtd return</div><div class="v num ${cls(p.twr_pct)}">${pct(p.twr_pct)}</div><div class="s">${p.cagr != null ? "CAGR " + pct(p.cagr) : "CAGR after 6 mo"}</div></div>
+      <div class="kpi"><div class="k">Drawdown</div><div class="v num ${p.current_dd < -0.05 ? "dn" : ""}">${pct(p.current_dd)}</div><div class="s">worst ${pct(p.max_dd)}</div></div>
+      <div class="kpi"><div class="k">Same $ in SPY</div><div class="v num">${money(p.spy_value, 0)}</div><div class="s ${cls(spyPL)}">${smoney(spyPL)}</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="h2">Growth of the account <span class="r"><span class="seg" id="rangeSeg">${["1M","3M","6M","YTD","ALL"].map(r => `<button aria-pressed="${r === range}" data-r="${r}">${r === "ALL" ? "All" : r}</button>`).join("")}</span></span></div>
+    <div class="chartbox" id="eqChart"></div>
+    <div class="legend"><span><i style="background:var(--fg)"></i>Twin Engine</span><span><i style="background:var(--spy)"></i>SPY, same deposits</span><span><i style="background:var(--dn)"></i>Drawdown</span></div>
+  </div>
+
+  <div class="grid2">
+    ${engineCard("e1", "Engine 1", "Modified 9Sig + TOM", n.value, n.weight, [
+      ["TQQQ share of growth", `${n.tqqq_weight.toFixed(0)}%${n.tom_active ? " (TOM boost)" : ""}`],
+      ["TQQQ 20-day volatility", n.vol20 != null ? n.vol20.toFixed(0) + "%" : "—"],
+      ["Growth / defensive", `${money(n.growth, 0)} / ${money(n.defensive, 0)}`],
+      ["Quarter target (" + dfmt(n.quarter_end) + ")", money(n.quarter_target, 0)],
+    ], n.tqqq_weight, "TQQQ size")}
+    ${engineCard("e2", "Engine 2", "Leveraged Diversification (LDS)", l.value, l.weight, [
+      ["Gross leverage", l.gross.toFixed(2) + "x"],
+      ["Assets in uptrend", l.assets.filter(a => a.trend === "UP").map(a => a.sym).join(", ") || "none"],
+      ["Last rebalance", dlong(l.last_rebalance)],
+      ["Next weekly review", dlong(l.next_review)],
+      [l.fomc_active ? "Fed-day swap (active)" : "Next Fed-day swap", l.fomc_active ? "sell at close " + dlong(l.fomc_decision) : (l.fomc_entry ? "buy at close " + dlong(l.fomc_entry) : "—")],
+    ], Math.min(100, l.gross / 3 * 100), "Leverage used")}
+  </div>
+
+  <div class="grid2">
+    <div class="card"><div class="h2">Next actions</div><div class="list">${D.next_actions.map(a => `
+      <div class="li"><div class="when">${dfmt(a.date)}<div class="muted" style="font-weight:500">${daysTo(a.date) <= 0 ? "today" : "in " + daysTo(a.date) + "d"}</div></div><div class="what">${esc(a.what)}</div></div>`).join("")}</div></div>
+    <div class="card"><div class="h2">Today's moves <span class="r muted">${dlong(D.meta.as_of)}</span></div>
+      ${todays.length ? `<div class="list">${todays.map(t => `<div class="li"><span class="side ${t.side}">${t.side}</span><div class="what"><b>${esc(t.ticker)}</b> <span class="num fg2">${t.shares.toLocaleString()} @ ${px(t.price)}</span><div class="muted" style="font-size:12.5px">${esc(t.reason)}</div></div><div class="num">${money(t.value)}</div></div>`).join("")}</div>`
+      : `<div class="empty">No trades at today's close. ${D.events[0] ? esc(D.events[0].date === D.meta.as_of ? D.events[0].text : "") : ""}</div>`}
+    </div>
+  </div>
+
+  <div class="card"><div class="h2">Activity log</div><div class="list">${D.events.slice(0, 10).map(e => `<div class="li"><div class="when">${dfmt(e.date)}</div><div class="what fg2">${esc(e.text)}</div></div>`).join("")}</div></div>`;
+  $("#rangeSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; range = b.dataset.r; renderOverview(); });
+  drawEquity();
+}
+function engineCard(c, k, name, val, w, rows, meter, meterLab){
+  return `<div class="card engine ${c}">
+    <div class="ttl"><span class="pill ${c}"><span class="dot"></span>${k}</span><b>${name}</b></div>
+    <div class="val num">${money(val, 0)} <span class="fg2" style="font-size:14px">${w.toFixed(1)}% of account</span></div>
+    <div class="row" style="font-size:12px"><span>${meterLab}</span><span>${meter.toFixed(0)}%</span></div>
+    <div class="meter" style="margin-top:4px"><i style="width:${Math.max(2, Math.min(100, meter))}%;background:var(--${c})"></i></div>
+    <div class="rows">${rows.map(r => `<div class="row"><span>${esc(r[0])}</span><span>${esc(r[1])}</span></div>`).join("")}</div>
+  </div>`;
+}
+function sliceRange(eq){
+  if (range === "ALL") return eq;
+  const last = new Date(eq[eq.length - 1].date + "T12:00:00"); let from = new Date(last);
+  if (range === "1M") from.setMonth(from.getMonth() - 1); else if (range === "3M") from.setMonth(from.getMonth() - 3);
+  else if (range === "6M") from.setMonth(from.getMonth() - 6); else if (range === "YTD") from = new Date(last.getFullYear(), 0, 1);
+  const s = eq.filter(e => new Date(e.date + "T12:00:00") >= from); return s.length > 1 ? s : eq.slice(-2);
+}
+function drawEquity(){
+  const box = $("#eqChart"); if (!box) return;
+  const eq = sliceRange(D.equity);
+  const W = Math.max(300, box.clientWidth || 600), H1 = W < 500 ? 190 : 240, H2 = 60, G = 14, L = 6, R = 58, T = 10;
+  const H = T + H1 + G + H2 + 18;
+  const vals = eq.flatMap(e => [e.value, e.spy]); let lo = Math.min(...vals), hi = Math.max(...vals);
+  const padv = (hi - lo) * .08 || hi * .05; lo -= padv; hi += padv;
+  const x = i => L + (W - L - R) * (eq.length === 1 ? 0 : i / (eq.length - 1));
+  const y = v => T + H1 - (v - lo) / (hi - lo) * H1;
+  // drawdown of whole history, then sliced
+  let pk = -Infinity; const ddAll = D.equity.map(e => { pk = Math.max(pk, e.value); return e.value / pk - 1; });
+  const off = D.equity.length - eq.length, dd = ddAll.slice(off);
+  const ddMin = Math.min(-0.05, ...dd); const yd = v => T + H1 + G + (v / ddMin) * H2;
+  const path = (f) => eq.map((e, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + f(e, i).toFixed(1)).join(" ");
+  const vline = path(e => y(e.value)), sline = path(e => y(e.spy));
+  const area = vline + ` L${x(eq.length - 1).toFixed(1)} ${T + H1} L${x(0).toFixed(1)} ${T + H1} Z`;
+  const ddp = eq.map((e, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + yd(dd[i]).toFixed(1)).join(" ") + ` L${x(eq.length - 1).toFixed(1)} ${T + H1 + G} L${x(0).toFixed(1)} ${T + H1 + G} Z`;
+  const ticks = 4, tv = [...Array(ticks + 1)].map((_, i) => lo + (hi - lo) * i / ticks);
+  const nx = Math.min(eq.length, W < 500 ? 3 : 5), xi = [...Array(nx)].map((_, i) => Math.round(i * (eq.length - 1) / (nx - 1 || 1)));
+  const last = eq[eq.length - 1], up = last.value >= eq[0].value;
+  const span = hi - lo; const fmtK = v => span < 2500 ? "$" + Math.round(v).toLocaleString() : v >= 1e6 ? "$" + (v / 1e6).toFixed(2) + "M" : v >= 1e4 ? "$" + (v / 1e3).toFixed(1) + "k" : "$" + Math.round(v).toLocaleString();
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Account value versus SPY">
+    <defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${css(up ? "--up" : "--dn")}" stop-opacity=".28"/><stop offset="1" stop-color="${css(up ? "--up" : "--dn")}" stop-opacity="0"/></linearGradient></defs>
+    ${tv.map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="${css("--line")}" stroke-width="1"/><text x="${W - R + 8}" y="${y(v) + 4}" font-size="11" font-family="IBM Plex Mono, monospace" fill="${css("--fg3")}">${fmtK(v)}</text>`).join("")}
+    <path d="${area}" fill="url(#ga)"/>
+    <path d="${sline}" fill="none" stroke="${css("--spy")}" stroke-width="1.6" stroke-dasharray="4 4"/>
+    <path d="${vline}" fill="none" stroke="${css("--fg")}" stroke-width="2.2" stroke-linejoin="round"/>
+    <circle cx="${x(eq.length - 1)}" cy="${y(last.value)}" r="4.5" fill="${css(up ? "--up" : "--dn")}" stroke="${css("--card")}" stroke-width="2"/>
+    <line x1="${L}" x2="${W - R}" y1="${T + H1 + G}" y2="${T + H1 + G}" stroke="${css("--line2")}"/>
+    <path d="${ddp}" fill="${css("--dn")}" fill-opacity=".22" stroke="${css("--dn")}" stroke-width="1.2"/>
+    <text x="${W - R + 8}" y="${T + H1 + G + 4}" font-size="11" font-family="IBM Plex Mono, monospace" fill="${css("--fg3")}">0%</text>
+    <text x="${W - R + 8}" y="${T + H1 + G + H2 + 4}" font-size="11" font-family="IBM Plex Mono, monospace" fill="${css("--fg3")}">${(ddMin * 100).toFixed(0)}%</text>
+    ${xi.map((i, k) => `<text x="${x(i)}" y="${H - 2}" font-size="11" font-family="IBM Plex Mono, monospace" fill="${css("--fg3")}" text-anchor="${k === 0 ? "start" : k === xi.length - 1 ? "end" : "middle"}">${dfmt(eq[i].date, {month: "short", day: "numeric", year: range === "ALL" && eq.length > 300 ? "2-digit" : undefined})}</text>`).join("")}
+    <line id="hx" x1="0" x2="0" y1="${T}" y2="${T + H1 + G + H2}" stroke="${css("--fg3")}" stroke-dasharray="2 3" visibility="hidden"/>
+    <rect x="${L}" y="0" width="${W - L - R}" height="${H}" fill="transparent" id="hit"/>
+  </svg><div class="tip" id="tip" hidden></div>`;
+  const svg = box.querySelector("svg"), tip = $("#tip"), hx = svg.querySelector("#hx");
+  const move = ev => {
+    const r = svg.getBoundingClientRect(), sx = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left, k = W / r.width;
+    const i = Math.max(0, Math.min(eq.length - 1, Math.round((sx * k - L) / (W - L - R) * (eq.length - 1)))); const e = eq[i];
+    hx.setAttribute("x1", x(i)); hx.setAttribute("x2", x(i)); hx.setAttribute("visibility", "visible");
+    tip.hidden = false; tip.style.left = Math.min(Math.max(x(i) / k, 80), r.width - 80) + "px"; tip.style.top = (y(e.value) / k) + "px";
+    tip.innerHTML = `<div style="color:var(--fg3)">${dfmt(e.date, {month: "short", day: "numeric", year: "numeric"})}</div><div>Twin ${money(e.value, 0)}</div><div style="color:var(--spy)">SPY ${money(e.spy, 0)}</div><div class="dn">DD ${(dd[i] * 100).toFixed(1)}%</div>`;
+  };
+  const hide = () => { tip.hidden = true; hx.setAttribute("visibility", "hidden"); };
+  svg.addEventListener("pointermove", move); svg.addEventListener("pointerleave", hide); svg.addEventListener("touchmove", move, {passive: true}); svg.addEventListener("touchend", hide);
+}
+
+/* ---------------- positions ---------------- */
+function renderPositions(){
+  const tot = D.portfolio.value;
+  const groups = ["9SIG", "LDS"].map(sl => {
+    const ps = D.positions.filter(p => p.sleeve === sl);
+    const v = ps.reduce((a, p) => a + p.value, 0), pl = ps.reduce((a, p) => a + (p.pl || 0), 0);
+    return `<div class="sleevehdr"><span class="pill ${sleeveCls(sl)}"><span class="dot"></span>${sl === "9SIG" ? "Engine 1" : "Engine 2"}</span><b>${sleeveName(sl)}</b><span class="num">${money(v, 0)} · <span class="${cls(pl)}">${smoney(pl)}</span></span></div>
+      ${ps.map(p => p.ticker === "CASH" ? `<div class="card" style="padding:12px 16px;display:flex;justify-content:space-between"><span class="fg2">Cash (uninvested)</span><span class="num">${money(p.value)}</span></div>` : posCard(p, tot)).join("")}`;
+  }).join("");
+  const n = D.positions.filter(p => p.ticker !== "CASH").length;
+  $("#positions").innerHTML = `<div class="card" style="padding:12px 16px"><div class="row"><span>Open positions</span><span>${n}</span></div><div class="row"><span>Unrealized P&L</span><span class="${cls(D.portfolio.unrealized_pl)}">${smoney(D.portfolio.unrealized_pl)}</span></div><div class="row"><span>Realized P&L (closed lots)</span><span class="${cls(D.portfolio.realized_pl)}">${smoney(D.portfolio.realized_pl)}</span></div><div class="row"><span>Gross exposure</span><span>${D.portfolio.gross_exposure.toFixed(2)}x</span></div></div>${groups}`;
+}
+function posCard(p, tot){
+  const c = sleeveCls(p.sleeve);
+  const rv = p.next_review ? daysTo(p.next_review) : null;
+  return `<article class="card pos">
+    <div class="top">
+      <div class="tk ${c}">${esc(p.ticker)}</div>
+      <div class="nm"><b>${esc(p.ticker)}</b> <span class="muted" style="font-size:13px">${esc(p.name)}</span><div>${esc(p.role)}</div></div>
+      <div class="pl"><div class="v">${money(p.value)}</div><div class="p ${cls(p.pl)}">${smoney(p.pl)} · ${pct(p.pl_pct)}</div></div>
+    </div>
+    <div style="padding:0 16px 12px"><div class="row" style="font-size:12px"><span>${p.weight.toFixed(1)}% of account</span><span class="${cls(p.day_pl)}">today ${smoney(p.day_pl)} (${pct(p.day_pct, 2)})</span></div>
+      <div class="wbar"><i style="width:${Math.min(100, p.weight)}%;background:var(--${c})"></i></div></div>
+    <div class="facts">
+      <div class="fact"><div class="k">Entered</div><div class="v">${dfmt(p.first_entry, {month: "short", day: "numeric", year: "2-digit"})}</div></div>
+      <div class="fact"><div class="k">Avg entry</div><div class="v">${px(p.avg_cost)}</div></div>
+      <div class="fact"><div class="k">Now</div><div class="v">${px(p.price)}</div></div>
+      <div class="fact"><div class="k">Shares</div><div class="v">${p.shares.toLocaleString("en-US", {maximumFractionDigits: 4})}</div></div>
+    </div>
+    <div class="why"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="var(--${c})" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><div><b>Why it's held &amp; when it exits.</b> ${esc(p.exit_rule)}</div></div>
+    <div class="exitrow"><span class="pill neutral">Held ${p.held_days}d${p.held_days > 365 ? " · long-term" : ""}</span>${p.next_review ? `<span class="pill ${rv <= 1 ? "dn" : c}">Next check ${dlong(p.next_review)}${rv != null ? " · " + (rv <= 0 ? "today" : "in " + rv + "d") : ""}</span>` : ""}${p.last_entry && p.last_entry !== p.first_entry ? `<span class="pill neutral">Last added ${dfmt(p.last_entry)}</span>` : ""}</div>
+    <details class="lots"><summary>Tax lots (${p.lots.length}) · first in, first out</summary>
+      <div class="tblwrap"><table><thead><tr><th>Bought</th><th>Shares</th><th>Price</th><th>P&L</th><th>Term</th></tr></thead><tbody>
+      ${p.lots.map(l => { const hd = daysTo(l.date) * -1; return `<tr><td>${dfmt(l.date, {month: "short", day: "numeric", year: "2-digit"})}</td><td>${l.shares.toLocaleString("en-US", {maximumFractionDigits: 4})}</td><td>${px(l.price)}</td><td class="${cls(l.pl_pct)}">${pct(l.pl_pct)}</td><td>${hd > 365 ? "Long" : "Short · " + (366 - hd) + "d to LT"}</td></tr>`; }).join("")}
+      </tbody></table></div></details>
+  </article>`;
+}
+
+/* ---------------- trades ---------------- */
+function renderTrades(){
+  const t = D.trades.filter(x => (tradeFilter.side === "ALL" || x.side === tradeFilter.side) && (tradeFilter.sleeve === "ALL" || x.sleeve === tradeFilter.sleeve) && (!tradeFilter.q || x.ticker.toLowerCase().includes(tradeFilter.q.toLowerCase()) || (x.reason || "").toLowerCase().includes(tradeFilter.q.toLowerCase())));
+  const sells = D.trades.filter(x => x.side === "SELL"), rp = sells.reduce((a, x) => a + (x.realized_pl || 0), 0);
+  const stp = sells.filter(x => x.term === "SHORT").reduce((a, x) => a + (x.realized_pl || 0), 0);
+  const wins = sells.filter(x => (x.realized_pl || 0) > 0).length;
+  const shown = t.slice(0, tradeLimit), groups = [];
+  shown.forEach(x => { if (!groups.length || groups[groups.length - 1].date !== x.date) groups.push({date: x.date, items: []}); groups[groups.length - 1].items.push(x); });
+  const row = x => `<div class="tr"><span class="side ${x.side}">${x.side}</span>
+      <div class="m" style="min-width:0"><b>${esc(x.ticker)}</b> <span class="pill ${sleeveCls(x.sleeve)}" style="padding:3px 6px;font-size:10px">${x.sleeve === "9SIG" ? "9Sig" : "LDS"}</span><br><span>${x.shares.toLocaleString("en-US", {maximumFractionDigits: 4})} @ ${px(x.price)}</span><div class="rs">${esc(x.reason)}</div></div>
+      <div class="r">${money(x.value)}${x.side === "SELL" ? `<small class="${cls(x.realized_pl)}">${smoney(x.realized_pl)} (${pct(x.realized_pct)})</small><small class="muted">${Math.round(x.hold_days)}d · ${x.term === "LONG" ? "long" : "short"}-term</small>` : ""}</div></div>`;
+  const rows = groups.map(g => `<div class="daygrp"><span>${dfmt(g.date, {weekday: "short", month: "short", day: "numeric", year: "numeric"})}</span><span>${g.items.length} order${g.items.length > 1 ? "s" : ""}</span></div><div class="card" style="padding:0">${g.items.map(row).join("")}</div>`).join("");
+  $("#trades").innerHTML = `
+    <div class="card" style="padding:12px 16px"><div class="row"><span>Orders</span><span>${D.trades.length.toLocaleString()}</span></div><div class="row"><span>Realized P&L</span><span class="${cls(rp)}">${smoney(rp)}</span></div><div class="row"><span>Short-term share of realized gains</span><span>${rp ? Math.round(stp / rp * 100) + "%" : "—"}</span></div><div class="row"><span>Winning sells</span><span>${sells.length ? Math.round(wins / sells.length * 100) + "% of " + sells.length : "—"}</span></div></div>
+    <div class="filters" id="tf">
+      ${["ALL", "BUY", "SELL"].map(s => `<button class="chip" data-k="side" data-v="${s}" aria-pressed="${tradeFilter.side === s}">${s === "ALL" ? "All" : s === "BUY" ? "Buys" : "Sells"}</button>`).join("")}
+      ${["ALL", "9SIG", "LDS"].map(s => `<button class="chip" data-k="sleeve" data-v="${s}" aria-pressed="${tradeFilter.sleeve === s}">${s === "ALL" ? "Both engines" : s === "9SIG" ? "9Sig" : "LDS"}</button>`).join("")}
+      <input class="search" id="tq" type="search" placeholder="Ticker or reason" value="${esc(tradeFilter.q)}" aria-label="Filter trades">
+    </div>
+    <div>${t.length ? `<div>${rows}</div>` : '<div class="card empty">No trades match.</div>'}${t.length > tradeLimit ? `<button class="more" id="moreT">Show ${Math.min(60, t.length - tradeLimit)} more of ${t.length - tradeLimit}</button>` : ""}</div>`;
+  $("#tf").addEventListener("click", e => { const b = e.target.closest(".chip"); if (!b) return; tradeFilter[b.dataset.k] = b.dataset.v; tradeLimit = 60; renderTrades(); });
+  const q = $("#tq"); q.addEventListener("input", () => { tradeFilter.q = q.value; tradeLimit = 60; const pos = q.selectionStart; renderTrades(); const n = $("#tq"); n.focus(); n.setSelectionRange(pos, pos); });
+  const m = $("#moreT"); if (m) m.addEventListener("click", () => { tradeLimit += 60; renderTrades(); });
+}
+
+/* ---------------- signals ---------------- */
+function renderSignals(){
+  const n = D.sleeves.nine, l = D.sleeves.lds, prm = D.params;
+  const vol = n.vol20 ?? 0, base = n.base_weight, vT = Math.round(prm.vol_target * 100), vH = Math.round(prm.vol_target * Math.pow(2, 1 / prm.vol_power) * 100), vZ = Math.round(prm.vol_target * Math.pow(10, 1 / prm.vol_power) * 100);
+  // gauge 0..120% vol
+  const G = 120, a0 = Math.PI, ang = v => a0 - Math.min(v, G) / G * Math.PI, cx = 100, cy = 100, R = 80;
+  const pt = (v, r) => [cx + r * Math.cos(ang(v)), cy - r * Math.sin(ang(v))];
+  const arc = (v1, v2, col, w) => { const [x1, y1] = pt(v1, R), [x2, y2] = pt(v2, R); return `<path d="M${x1} ${y1} A${R} ${R} 0 0 1 ${x2} ${y2}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="butt"/>`; };
+  const [nx, ny] = pt(vol, R - 16);
+  const gauge = `<svg viewBox="-14 0 228 118" role="img" aria-label="TQQQ volatility gauge">
+    ${arc(0, vT, css("--up"), 14)}${arc(vT, vH, css("--warn"), 14)}${arc(vH, G, css("--dn"), 14)}
+    ${[0, Math.round(vT / 2), vT, vZ, 120].map(v => { const [tx, ty] = pt(v, R + 15); return `<text x="${tx}" y="${ty + 4}" font-size="9.5" text-anchor="middle" font-family="IBM Plex Mono, monospace" fill="${css("--fg3")}">${v}</text>`; }).join("")}
+    <line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="${css("--fg")}" stroke-width="3" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="6" fill="${css("--fg")}"/>
+  </svg>`;
+  // TOM calendar for the month containing the next TOM window
+  const today = new Date(D.meta.as_of + "T12:00:00"), ts = new Date(n.tom_start + "T12:00:00"), te = new Date(n.tom_end + "T12:00:00");
+  const tomFirst = new Date(ts); tomFirst.setDate(tomFirst.getDate() + 1);   // TOM days held = day after buy close through tom_end
+  const month = new Date(ts.getFullYear(), ts.getMonth(), 1), m2 = new Date(te.getFullYear(), te.getMonth(), 1);
+  const calHtml = [month, m2].filter((v, i, arr) => i === 0 || v.getMonth() !== arr[0].getMonth()).map(mo => {
+    const first = new Date(mo), days = new Date(mo.getFullYear(), mo.getMonth() + 1, 0).getDate(), pad = first.getDay();
+    let cells = ["S", "M", "T", "W", "T", "F", "S"].map(d => `<div class="w">${d}</div>`).join("") + Array(pad).fill('<div class="d blank"></div>').join("");
+    for (let d = 1; d <= days; d++) {
+      const dt = new Date(mo.getFullYear(), mo.getMonth(), d, 12), wk = dt.getDay() > 0 && dt.getDay() < 6;
+      const inTom = dt >= tomFirst && dt <= te && wk, isToday = dt.toDateString() === today.toDateString();
+      cells += `<div class="d ${wk ? "trade" : ""} ${inTom ? "tom" : ""} ${isToday ? "today" : ""}">${d}</div>`;
+    }
+    return `<div><div class="fg2" style="font:600 13px var(--f-body);margin-top:10px">${mo.toLocaleDateString("en-US", {month: "long", year: "numeric"})}</div><div class="cal">${cells}</div></div>`;
+  }).join("");
+  const qPct = Math.max(0, Math.min(100, n.growth / n.quarter_target * 100));
+  const assets = l.assets.map(a => {
+    const d = a.pct_vs_sma * 100, pos = 50 + Math.max(-45, Math.min(45, d / 20 * 45)), ex = l.exposures[a.sym] || 0;
+    return `<div class="asset"><div><div class="sym">${a.sym}</div><span class="pill ${a.trend === "UP" ? "up" : "dn"}" style="margin-top:4px">${a.trend === "UP" ? "▲ Up" : "▼ Down"}</span></div>
+      <div style="min-width:0"><div class="track"><span class="mid"></span><span class="mk" style="left:${pos}%;background:${a.trend === "UP" ? "var(--up)" : "var(--dn)"}"></span></div>
+        <div class="sub"><span>${pct(d)} vs 210-day avg ${px(a.sma)}</span><span>Momentum ${pct(a.mom_blend * 100)} · overlay ${a.overlay === "LONG" ? "long" : "short"}</span></div></div>
+      <div class="num" style="text-align:right"><div style="font-weight:600">${ex >= 0 ? "" : "−"}${Math.abs(ex).toFixed(2)}x</div><div class="muted" style="font-size:11px">exposure</div></div></div>`;
+  }).join("");
+  $("#signals").innerHTML = `
+  <div class="card"><div class="h2"><span class="pill e1"><span class="dot"></span>Engine 1</span>Volatility switch</div>
+    <div class="gauge">${gauge}<div class="txt">
+      <div class="muted" style="font-size:12px">TQQQ 20-day volatility</div><div class="bigpct num">${vol.toFixed(0)}%</div>
+      <div class="rows"><div class="row"><span>Switch size (base)</span><span>${base.toFixed(0)}%</span></div><div class="row"><span>Held now</span><span>${n.tqqq_weight.toFixed(0)}%${n.tom_active ? " · TOM" : ""}</span></div>
+      <div class="row"><span>Full size while vol ≤</span><span>${vT}%</span></div><div class="row"><span>About half at</span><span>${vH}%</span></div><div class="row"><span>Near zero above</span><span>${vZ}%</span></div></div>
+    </div></div></div>
+
+  <div class="grid2">
+    <div class="card"><div class="h2"><span class="pill e1"><span class="dot"></span>Engine 1</span>Turn-of-month window</div>
+      <div class="fg2" style="font-size:13.5px">${n.tom_active ? `<b style="color:var(--fg)">Active now.</b> TQQQ held at full size until the close on ${dlong(n.tom_end)}.` : `Next window: buy at the close on <b style="color:var(--fg)">${dlong(n.tom_start)}</b>, back to normal size at the close on <b style="color:var(--fg)">${dlong(n.tom_end)}</b>.`} ${base >= 99.9 ? "The switch is already at 100%, so this window will not trade." : ""}</div>
+      ${calHtml}
+    </div>
+    <div class="card"><div class="h2"><span class="pill e1"><span class="dot"></span>Engine 1</span>9Sig quarterly signal</div>
+      <div class="row"><span>Growth sub-sleeve now</span><span>${money(n.growth, 0)}</span></div>
+      <div class="qbar"><i style="width:${qPct}%"></i><b style="left:calc(${Math.min(100, 100)}% - 2px)"></b></div>
+      <div class="row"><span>Target on ${dlong(n.quarter_end)}</span><span>${money(n.quarter_target, 0)}</span></div>
+      <div class="row"><span>${n.quarter_gap >= 0 ? "Shortfall (would buy TQQQ)" : "Excess (would sell to reserve)"}</span><span class="${n.quarter_gap >= 0 ? "up" : "dn"}">${money(Math.abs(n.quarter_gap), 0)}</span></div>
+      <div class="row"><span>Defensive reserve (TLT/GLD)</span><span>${money(n.defensive, 0)}</span></div>
+      <div class="row"><span>30-down sell skips left</span><span>${n.skips_left}</span></div>
+      <div class="muted" style="font-size:12.5px;margin-top:8px">The target grows 9% per quarter from the growth balance after the last quarterly trade. ${l.rebalance_day && l.rebalance_day === n.quarter_end ? "Same day: year-end reset of both engines to 50/50." : "The two engines are reset to 50/50 once a year, at the close on " + dlong(l.rebalance_day) + "."}</div>
+    </div>
+  </div>
+
+  <div class="card"><div class="h2"><span class="pill e2"><span class="dot"></span>Engine 2</span>Fed-day swap <span class="r">${l.fomc_active ? '<span class="pill up">Active</span>' : '<span class="pill">Waiting</span>'}</span></div>
+    ${l.fomc_active
+      ? `<div class="fg2" style="font-size:13.5px"><b style="color:var(--fg)">The whole LDS sleeve is in TQQQ</b> for the Fed decision on ${dlong(l.fomc_decision)}. At that day's close: sell the TQQQ and buy back the LDS positions.</div>`
+      : `<div class="row"><span>Next Fed decision</span><span>${l.fomc_decision ? dlong(l.fomc_decision) + " · in " + daysTo(l.fomc_decision) + "d" : "—"}</span></div>
+         <div class="row"><span>Swap into TQQQ at the close</span><span>${l.fomc_entry ? dlong(l.fomc_entry) : "—"}</span></div>
+         <div class="row"><span>Swap back at the close</span><span>${l.fomc_decision ? dlong(l.fomc_decision) : "—"}</span></div>`}
+    <div class="muted" style="font-size:12.5px;margin-top:8px">Stocks have tended to rise on scheduled Fed decision days. Eight times a year the LDS sleeve holds TQQQ for that one day. Engine 1 is not affected.</div>
+  </div>
+
+  <div class="card"><div class="h2"><span class="pill e2"><span class="dot"></span>Engine 2</span>LDS trend board <span class="r muted">next review ${dlong(l.next_review)}</span></div>
+    <div>${assets}</div>
+    <div class="muted" style="font-size:12.5px;margin-top:10px">Marker shows price vs its 210-day average (center line, ±20% scale). Assets above the line are held in the levered core; momentum sets the small long/short overlay. Exposure = effective multiple of the LDS sleeve actually held.</div>
+  </div>`;
+}
+
+/* ---------------- strategy ---------------- */
+function renderStrategy(){
+  const P = D.params;
+  $("#strategy").innerHTML = `
+  <div class="card prose">
+    <h3>How Twin Engine works</h3>
+    <p>Two independent strategies share one account. On the <b>last trading day of the year</b> they are reset to <b>50% / 50%</b>. Contributions are split 50/50 on the first trading day of each month. Every order fills at the close.</p>
+    <h3><span style="color:var(--e1)">Engine 1</span> · Modified 9Sig + turn-of-month</h3>
+    <ul>
+      <li><b>Two buckets:</b> a growth sub-sleeve (TQQQ) and a defensive reserve (50% TLT, 50% GLD). Starts 60 / 40.</li>
+      <li><b>Quarterly signal:</b> the growth bucket's target is last quarter's post-trade balance × 1.09 (+ half of new deposits). Above target, sell the excess into the reserve. Below target, buy the shortfall from the reserve.</li>
+      <li><b>30-down rule:</b> after a quarter where the growth bucket fell 30% or more, ignore the next 4 sell signals.</li>
+      <li><b>Volatility switch (daily):</b> TQQQ share of the growth bucket = min(1, (${Math.round(P.vol_target * 100)}% ÷ TQQQ 20-day volatility)<sup>${P.vol_power}</sup>). It only changes when the new value differs by more than 5 points. The rest sits in TLT/GLD.</li>
+      <li><b>Turn-of-month:</b> hold full TQQQ from the last trading day of the month through the 3rd trading day of the next. Only trades when the switch is below 100%.</li>
+    </ul>
+    <h3><span style="color:var(--e2)">Engine 2</span> · Leveraged Diversification (LDS)</h3>
+    <ul>
+      <li><b>Checked at the close of the last trading day of each week</b> using SPY, QQQ, TLT and GLD.</li>
+      <li><b>Core (85%):</b> assets closing above their 210-day average, weighted by 1 ÷ 63-day volatility, scaled up to the most leverage the ETFs allow (3x for stocks and Treasuries, 2x for gold): UPRO, TQQQ, TMF, UGL.</li>
+      <li><b>Overlay (15%):</b> long if the average of 1, 3, 6 and 12-month returns is positive, short (inverse ETF) if negative; sized to 15% volatility. Inverse ETFs: SPXU, SQQQ, TMV, GLL.</li>
+      <li><b>Trade only if</b> the total change is more than 5% of the sleeve.</li>
+      <li><b>Fed-day swap:</b> at the close of the trading day before each scheduled Fed (FOMC) decision, sell the whole LDS sleeve and buy TQQQ. At the close of decision day, sell the TQQQ and buy back the normal LDS positions. 8 times a year.</li>
+    </ul>
+    <h3>What it never does</h3>
+    <p>No stop-losses, no profit targets, no discretionary overrides. Every exit is one of the rules above.</p>
+  </div>
+  <div class="grid2">
+    <div class="card"><div class="h2">Backtest reference ($20k)</div><div class="tblwrap"><table>
+      <thead><tr><th>Period</th><th>CAGR</th><th>Max DD</th><th>Final</th></tr></thead><tbody>
+      <tr><td>Twin Engine 2000–26</td><td>32.7%</td><td class="dn">−43%</td><td>$38.2M</td></tr>
+      <tr><td>2007–26 (fresh start)</td><td>39.2%</td><td class="dn">−38%</td><td>$13.5M</td></tr>
+            <tr><td>SPY 2000–26</td><td>8.2%</td><td class="dn">−55%</td><td>$165k</td></tr>
+      </tbody></table></div>
+      <div class="muted" style="font-size:12.5px;margin-top:8px">Realistic live expectation ≈ 20–25%/yr with a 45–60% drawdown at some point. Engine replay of v1.3 at 0.05% slippage per fill. Beat SPY in 20 of 27 years; worst year −36% (2022).</div></div>
+    <div class="card"><div class="h2">Parameters</div><div class="tblwrap"><table><tbody>
+      <tr><td>Split 9Sig / LDS</td><td>${Math.round(P.split_9sig * 100)} / ${Math.round((1 - P.split_9sig) * 100)}</td></tr>
+      <tr><td>9Sig quarterly growth</td><td>${(P.sig_rate * 100).toFixed(0)}%</td></tr>
+      <tr><td>Vol switch target / power / band</td><td>${P.vol_target * 100}% / ${P.vol_power} / ${P.vol_band * 100} pts</td></tr>
+      <tr><td>Vol lookback</td><td>${P.vol_lookback} days</td></tr>
+      <tr><td>TOM window</td><td>last day + first ${P.tom_after}</td></tr>
+      <tr><td>LDS trend average</td><td>${P.sma_days} days</td></tr>
+      <tr><td>LDS core / overlay</td><td>${P.lds_core * 100}% / ${P.lds_overlay * 100}%</td></tr>
+      <tr><td>LDS trade threshold</td><td>${P.lds_threshold * 100}%</td></tr>
+      <tr><td>50/50 reset</td><td>year end</td></tr>
+      <tr><td>Fed-day swap</td><td>${P.fomc_swap === false ? "off" : "on"}</td></tr>
+      <tr><td>Slippage per fill</td><td>${P.slippage_bps} bp</td></tr>
+      <tr><td>Monthly contribution</td><td>${money(D.meta.contrib_monthly, 0)}</td></tr>
+      </tbody></table></div></div>
+  </div>
+  <div class="card prose"><h3>Paper-trading pass criteria</h3><ul>
+    <li>Engine ran every trading day for at least 3 months, including one Fed-day swap and one turn-of-month window.</li>
+    <li>A replay of the same dates matches this ledger within ±1%.</li>
+    <li>Every trade has a rule-based reason you understand.</li>
+    <li>You could place each order as a market-on-close order by 3:45 PM ET.</li>
+    <li>You held through at least one −10% week without wanting to override.</li>
+    <li>Once a year: add the Fed's next-year meeting dates to the engine (it warns you here when the list runs low).</li></ul>
+    <p class="muted">Paper trading only. Not financial advice. Leveraged ETFs can lose most of their value quickly.</p></div>`;
+}
+
+/* ---------------- tabs ---------------- */
+function show(id, push){
+  document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === id)));
+  document.querySelectorAll("section.tab").forEach(s => s.hidden = s.id !== id);
+  try { localStorage.setItem("te-tab", id); } catch (e) {}
+  if (push) { try { history.replaceState(null, "", "#" + id); } catch (e) {} }
+  if (id === "overview" && D) drawEquity();
+  window.scrollTo({top: 0});
+}
+document.querySelector("nav.tabs").addEventListener("click", e => { const b = e.target.closest("button"); if (b) show(b.dataset.tab, true); });
+let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (D && !$("#overview").hidden) drawEquity(); }, 150); });
+const mq = window.matchMedia("(prefers-color-scheme: dark)"); mq.addEventListener && mq.addEventListener("change", () => D && drawEquity());
+new MutationObserver(() => D && renderAll()).observe(document.documentElement, {attributes: true, attributeFilter: ["data-theme"]});
+load().then(() => {
+  let t = (location.hash || "").slice(1); if (!["overview", "positions", "trades", "signals", "strategy"].includes(t)) { try { t = localStorage.getItem("te-tab") || "overview"; } catch (e) { t = "overview"; } }
+  show(t, false);
+});
+})();
+</script>
+
+</body></html>

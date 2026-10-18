@@ -1,0 +1,40 @@
+name: Start account (once)
+# Opens the paper account at the close of the start date. Refuses if an account already exists.
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "Open at the close of (YYYY-MM-DD)"
+        default: "2026-10-16"
+      capital:
+        description: "Starting capital"
+        default: "20000"
+      contrib:
+        description: "Monthly contribution"
+        default: "200"
+permissions:
+  contents: write
+concurrency:
+  group: twin-engine
+  cancel-in-progress: false
+jobs:
+  start:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Open the account
+        run: |
+          if [ -f state.json ]; then echo "::error::An account already exists (state.json). Delete it in the repo first to start over."; exit 1; fi
+          python twin_engine.py run --start "${{ inputs.start }}" --capital "${{ inputs.capital }}" --contrib "${{ inputs.contrib }}" --whole-shares | tee run.log
+          { echo '```'; cat run.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Save
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state.json summary.json
+          git commit -m "Open paper account ${{ inputs.start }}"; git push

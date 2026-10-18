@@ -1,0 +1,27 @@
+name: Validate engine
+# Replays the engine over the last 3 years of real prices in a scratch folder and runs the checks.
+# Does not touch the account. The report is on the run page; files are under Artifacts.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Validate
+        run: |
+          set +e; python twin_engine.py validate; code=$?; set -e
+          { echo '```'; cat validation/validation_report.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $code
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation
+          path: validation/
