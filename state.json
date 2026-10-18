@@ -1,0 +1,262 @@
+{
+ "version": "1.4.0",
+ "start_date": "2026-10-16",
+ "start_capital": 20000.0,
+ "contrib_monthly": 200.0,
+ "last_date": "2026-10-16",
+ "contributed": 20000.0,
+ "sleeves": {
+  "9SIG": {
+   "cash": 232.52685357208247,
+   "holdings": {
+    "TQQQ": 87.0,
+    "TLT": 24.0,
+    "GLD": 5.0
+   }
+  },
+  "LDS": {
+   "cash": 211.08295993804893,
+   "holdings": {
+    "UPRO": 41.0,
+    "TQQQ": 52.0,
+    "TMV": 3.0,
+    "GLL": 4.0
+   }
+  }
+ },
+ "lots": {
+  "9SIG|TQQQ": [
+   [
+    "2026-10-16",
+    87,
+    68.22364108428955
+   ]
+  ],
+  "9SIG|TLT": [
+   [
+    "2026-10-16",
+    24,
+    80.06601305236816
+   ]
+  ],
+  "9SIG|GLD": [
+   [
+    "2026-10-16",
+    5,
+    382.0864117675781
+   ]
+  ],
+  "LDS|UPRO": [
+   [
+    "2026-10-16",
+    41,
+    146.4592786743164
+   ]
+  ],
+  "LDS|TQQQ": [
+   [
+    "2026-10-16",
+    52,
+    68.22364108428955
+   ]
+  ],
+  "LDS|TMV": [
+   [
+    "2026-10-16",
+    3,
+    45.6791321685791
+   ]
+  ],
+  "LDS|GLL": [
+   [
+    "2026-10-16",
+    4,
+    24.85497038154602
+   ]
+  ]
+ },
+ "nine": {
+  "S": 6000.0,
+  "B": 4000.0,
+  "w_base": 1.0,
+  "w": 1.0,
+  "last_target": 6000.0,
+  "growth_index": 1.0,
+  "q_anchor": 1.0,
+  "skips": 0,
+  "new_cash": 0.0,
+  "initialized": true,
+  "vol20": 0.5564040796644957,
+  "raw": 1.0,
+  "tom_tomorrow": false
+ },
+ "lds": {
+  "exposures": {
+   "SPY": 4.02342438858351,
+   "QQQ": 2.375823668236392,
+   "TLT": -0.11058562363826376,
+   "GLD": -0.04773584148236324
+  },
+  "last_rebalance": "2026-10-16",
+  "diag": {
+   "SPY": {
+    "price": 763.25,
+    "sma": 719.7726731073288,
+    "pct_vs_sma": 0.060404247781421505,
+    "trend": "UP",
+    "vol63": 0.11095649266496799,
+    "mom_blend": 0.0686172433586702,
+    "overlay": "LONG"
+   },
+   "QQQ": {
+    "price": 709.7999877929688,
+    "sma": 670.8365269252232,
+    "pct_vs_sma": 0.05808190118438317,
+    "trend": "UP",
+    "vol63": 0.18790327945141952,
+    "mom_blend": 0.07308959623119735,
+    "overlay": "LONG"
+   },
+   "TLT": {
+    "price": 80.05000305175781,
+    "sma": 83.4686762491862,
+    "pct_vs_sma": -0.04095755858428052,
+    "trend": "DOWN",
+    "vol63": 0.10399098594765878,
+    "mom_blend": -0.04668816650406141,
+    "overlay": "SHORT"
+   },
+   "GLD": {
+    "price": 382.010009765625,
+    "sma": 414.4594765799386,
+    "pct_vs_sma": -0.07829346087603561,
+    "trend": "DOWN",
+    "vol63": 0.2409072025687154,
+    "mom_blend": -0.03976791581089903,
+    "overlay": "SHORT"
+   }
+  },
+  "last_check": "2026-10-16",
+  "target_exposures": {
+   "SPY": 4.02342438858351,
+   "QQQ": 2.375823668236392,
+   "TLT": -0.11058562363826376,
+   "GLD": -0.04773584148236324
+  }
+ },
+ "trades": [
+  {
+   "date": "2026-10-16",
+   "sleeve": "9SIG",
+   "ticker": "TQQQ",
+   "side": "BUY",
+   "shares": 87,
+   "price": 68.2236,
+   "value": 5935.46,
+   "reason": "Initial allocation"
+  },
+  {
+   "date": "2026-10-16",
+   "sleeve": "9SIG",
+   "ticker": "TLT",
+   "side": "BUY",
+   "shares": 24,
+   "price": 80.066,
+   "value": 1921.58,
+   "reason": "Initial allocation"
+  },
+  {
+   "date": "2026-10-16",
+   "sleeve": "9SIG",
+   "ticker": "GLD",
+   "side": "BUY",
+   "shares": 5,
+   "price": 382.0864,
+   "value": 1910.43,
+   "reason": "Initial allocation"
+  },
+  {
+   "date": "2026-10-16",
+   "sleeve": "LDS",
+   "ticker": "UPRO",
+   "side": "BUY",
+   "shares": 41,
+   "price": 146.4593,
+   "value": 6004.83,
+   "reason": "Initial allocation"
+  },
+  {
+   "date": "2026-10-16",
+   "sleeve": "LDS",
+   "ticker": "TQQQ",
+   "side": "BUY",
+   "shares": 52,
+   "price": 68.2236,
+   "value": 3547.63,
+   "reason": "Initial allocation"
+  },
+  {
+   "date": "2026-10-16",
+   "sleeve": "LDS",
+   "ticker": "TMV",
+   "side": "BUY",
+   "shares": 3,
+   "price": 45.6791,
+   "value": 137.04,
+   "reason": "Initial allocation"
+  },
+  {
+   "date": "2026-10-16",
+   "sleeve": "LDS",
+   "ticker": "GLL",
+   "side": "BUY",
+   "shares": 4,
+   "price": 24.855,
+   "value": 99.42,
+   "reason": "Initial allocation"
+  }
+ ],
+ "equity": [
+  {
+   "date": "2026-10-16",
+   "value": 19996.09,
+   "spy": 20000.0,
+   "nine": 9998.05,
+   "lds": 9998.04,
+   "contributed": 20000.0
+  }
+ ],
+ "spy_units": 26.203734032099575,
+ "prev_close": {
+  "GLD": 382.010009765625,
+  "GLL": 24.850000381469727,
+  "PSQ": 25.90999984741211,
+  "QID": 14.329999923706055,
+  "QLD": 87.72000122070312,
+  "QQQ": 709.7999877929688,
+  "SDS": 54.63999938964844,
+  "SH": 32.470001220703125,
+  "SPXU": 34.869998931884766,
+  "SPY": 763.25,
+  "SQQQ": 38.900001525878906,
+  "SSO": 69.25,
+  "TBF": 26.010000228881836,
+  "TBT": 39.91999816894531,
+  "TLT": 80.05000305175781,
+  "TMF": 28.040000915527344,
+  "TMV": 45.66999816894531,
+  "TQQQ": 68.20999908447266,
+  "UBT": 14.050000190734863,
+  "UGL": 45.779998779296875,
+  "UPRO": 146.42999267578125
+ },
+ "dividends": 0.0,
+ "events": [
+  {
+   "date": "2026-10-16",
+   "text": "LDS rebalanced (turnover 100%)"
+  }
+ ],
+ "fractional": false,
+ "close_before": {}
+}
