@@ -11,6 +11,11 @@ import te_lab
 
 PANEL = pd.read_pickle(os.path.join(HERE, "data", "panel.pkl"))
 PANEL["VIXLVL"] = pd.read_pickle(os.path.join(HERE, "data", "adj.pkl"))["^VIX"].reindex(PANEL.index).ffill()   # signal only, not traded
+_X = pd.read_pickle(os.path.join(HERE, "data", "extra.pkl")).reindex(PANEL.index)
+_A = pd.read_pickle(os.path.join(HERE, "data", "adj.pkl")).reindex(PANEL.index)
+for _c, _src in [("VIX3M", _X["^VIX3M"]), ("VVIX", _X["^VVIX"]), ("VWEHX", _X["VWEHX"]), ("VBMFX", _X["VBMFX"]), ("VFITX", _A["VFITX"]),
+                 ("QQQ_H", _X["QQQ_H"]), ("QQQ_L", _X["QQQ_L"]), ("QQQ_C", _X["QQQ_C"])]:
+    PANEL[_c] = _src.ffill() if not _c.startswith("QQQ_") else _src      # signals only, never traded
 WIN = 300                                     # history rows each step needs (210d SMA, 12m momentum, 63d cov)
 _BASE_P = dict(te.P)
 
@@ -45,6 +50,7 @@ def run(overrides=None, start="2000-01-03", end=None, capital=20000.0, slippage_
         eq = pd.Series([e["value"] for e in st["equity"]], index=pd.to_datetime([e["date"] for e in st["equity"]]))
         tdays = len({t["date"] for t in st["trades"]})
         s = stats(eq, tdays); s["equity"] = eq; s["n_trades"] = len(st["trades"])
+        s["expo"] = pd.DataFrame([e.get("x", {}) for e in st["equity"]], index=eq.index).fillna(0.0)
         return s
     finally:
         for k, v in saved.items(): setattr(te, k, v)

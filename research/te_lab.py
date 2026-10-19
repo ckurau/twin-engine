@@ -30,7 +30,9 @@ DEFAULTS = dict(growth=("TQQQ",), derisk_asset=None, def_trend=False, def_sma=20
                 swap_fomc=True, fomc_pre=1, fomc_lag=0, swap_tom=False, swap_preholiday=False, swap_dip=None,
                 swap_asset=(("TQQQ", 1.0),), rebal_band=None, tilt=0.0,
                 nine_dip_exit=None, swap_fomc_trend=False, swap_frac=1.0, vol_target_winter=None, vol_ewm_hl=None, vol_vix=False,
-                core_ew=False, tom_trend=False)
+                core_ew=False, tom_trend=False,
+                growth_rot=None, nine_cap=None, lds_riskoff=False, ndx_cap=None, dip_kind="rsi2")
+LEV_OF = {t: (a, L) for (a, L), t in ETF.items()}
 
 def p(k): return P.get(k, DEFAULTS[k])
 
@@ -71,6 +73,51 @@ def vol_switch(px, adj, date):
     if not v or math.isnan(v): return 1.0, v
     return float(min(max((tgt / v) ** P["vol_power"], 0.0), 1.0)), v
 
+def _sma(s, n): return float(s.iloc[-n:].mean())
+
+def _m13612(s):
+    s = s.dropna()
+    if len(s) < 253: return float("nan")
+    r = lambda k: float(s.iloc[-1] / s.iloc[-1 - 21 * k] - 1)
+    return (12 * r(1) + 4 * r(3) + 2 * r(6) + r(12)) / 4
+
+def riskoff(st, adj, cal, date):
+    """True when the chosen crash-warning signal is on (evaluated at today's close)"""
+    nc = p("nine_cap")
+    if not nc: return False
+    sig = nc[0]; arg = nc[2] if len(nc) > 2 else None; nine = st["nine"]
+    if sig == "ts":
+        v, v3 = adj["VIXLVL"].iloc[-1], adj["VIX3M"].iloc[-1]
+        return bool(v3 == v3 and v > v3 * (arg or 1.0))
+    if sig == "vixspike":
+        v = adj["VIXLVL"].dropna(); left = nine.get("spike_left", 0)
+        if len(v) > 11 and v.iloc[-1] >= (arg or 1.25) * float(v.iloc[-11:-1].mean()): left = 5
+        else: left = max(0, left - 1)
+        nine["spike_left"] = left; return left > 0
+    if sig == "vvix":
+        v = adj["VVIX"].iloc[-1]; return bool(v == v and v > (arg or 120))
+    if sig == "canary":
+        if cal.is_month_end(date) or "canary_on" not in nine:
+            nine["canary_on"] = any(_m13612(adj[c]) < 0 for c in ("EEM", "VBMFX"))
+        return nine["canary_on"]
+    if sig == "credit":
+        r = (adj["VWEHX"] / adj["VFITX"]).dropna(); n = arg or 50
+        return bool(len(r) >= n and float(r.iloc[-1]) < _sma(r, n))
+    raise ValueError(sig)
+
+def dip_signal(adj, kind, th):
+    q = adj["QQQ"].dropna(); up = float(q.iloc[-1]) > _sma(q, 200)
+    if not up: return False
+    hits = []
+    if "rsi2" in kind: hits.append(rsi2(q) < th)
+    if "ibs" in kind:
+        h, l, c = adj["QQQ_H"].iloc[-1], adj["QQQ_L"].iloc[-1], adj["QQQ_C"].iloc[-1]
+        hits.append(bool(h > l and (c - l) / (h - l) < 0.2))
+    if "vixstretch" in kind:
+        v = adj["VIXLVL"].dropna()
+        hits.append(len(v) > 13 and all(v.iloc[-1 - j] >= 1.05 * float(v.iloc[-11 - j:-1 - j].mean()) for j in range(3)))
+    return any(hits)
+
 def rsi2(s):
     r = s.diff().iloc[-3:]
     up = r.clip(lower=0).ewm(alpha=1 / 2, adjust=False).mean().iloc[-1]; dn = (-r.clip(upper=0)).ewm(alpha=1 / 2, adjust=False).mean().iloc[-1]
@@ -106,7 +153,7 @@ def lds_exposures(adj):
     for a, e in ov.items(): ex[a] += P["lds_overlay"] * e
     return dict(ex), diag
 
-def implement(expo):
+def implement(expo, kmax=3):
     expo = {a: e for a, e in expo.items() if abs(e) > 1e-6}
     if not expo: return {}
     def lev_for(a, e, k):
@@ -116,14 +163,14 @@ def implement(expo):
             return L if e > 0 else -L
         ok = sorted(L for L in LEVS[a] if L > 0 and L <= k) or [1]          # extra assets: 1x or 3x only
         return ok[-1]
-    for k in (1, 2, 3):
+    for k in [k for k in (1, 2, 3) if k <= kmax]:
         caps = {}
         for a, e in expo.items():
             L = lev_for(a, e, k); caps[ETF[(a, L)]] = caps.get(ETF[(a, L)], 0) + abs(e) / abs(L)
         if sum(caps.values()) <= 1 + 1e-9: return caps
     caps = {}
     for a, e in expo.items():
-        L = lev_for(a, e, 3); caps[ETF[(a, L)]] = caps.get(ETF[(a, L)], 0) + abs(e) / abs(L)
+        L = lev_for(a, e, kmax); caps[ETF[(a, L)]] = caps.get(ETF[(a, L)], 0) + abs(e) / abs(L)
     s = sum(caps.values()); return {t: c / max(s, 1.0) for t, c in caps.items()}
 
 def lds_review_due(cal, d):
@@ -137,7 +184,7 @@ def lds_review_due(cal, d):
 def step(st, date, adj, close, cal, divs=None, splits=None):
     nine, lds = st["nine"], st["lds"]
     ev = []
-    growth = list(p("growth")); deff = list(P["defensive"])
+    growth = [nine.get("gasset") or p("growth")[0]] if p("growth_rot") else list(p("growth")); deff = list(P["defensive"])
     prev = st["prev_close"]
     if nine["initialized"] and prev:
         rq = np.mean([close[t] / prev[t] - 1 for t in growth])
@@ -184,6 +231,16 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
             nine_trade = True
     if cal.is_rebalance_day(date) or not st.get("year_mark"):
         st["year_mark"] = None  # set after trades below
+    # --- 9Sig growth ETF rotation (month end): best relative momentum among the candidates
+    if p("growth_rot") and (cal.is_month_end(date) or not nine.get("gasset")):
+        cands, months, mode = p("growth_rot"); und = {"TQQQ": "QQQ", "UPRO": "SPY", "TNA": "IWM", "TECL": "XLK", "SOXL": "SOXX"}
+        if mode == "ratio200":
+            r = (adj["QQQ"] / adj["SPY"]).dropna(); pick = "TQQQ" if float(r.iloc[-1]) > _sma(r, 200) else "UPRO"
+        else:
+            sc = {c: _mom(adj[und[c]].dropna(), months) for c in cands}; sc = {c: v for c, v in sc.items() if v == v}
+            pick = max(sc, key=sc.get) if sc else cands[0]
+        if pick != nine.get("gasset"):
+            nine["gasset"] = pick; growth = [pick]; nine_trade = True
     # --- 9Sig weight for tomorrow
     vt = adj[growth[0]].dropna()
     raw, v20 = vol_switch(vt, adj, date)
@@ -196,13 +253,15 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
     uptrend = float(qqq.iloc[-1]) > float(qqq.iloc[-200:].mean())
     if p("tom_trend") and not uptrend: tom = False
     full = tom or (p("swap_9sig") and bull)
+    roff = riskoff(st, adj, cal, date)
     if p("nine_dip") is not None:
         r2 = rsi2(qqq); on = nine.get("dip_on", False)
-        if p("nine_dip_exit") is None: on = uptrend and r2 < p("nine_dip")
+        if p("nine_dip_exit") is None: on = dip_signal(adj, p("dip_kind"), p("nine_dip"))
         elif not on and uptrend and r2 < p("nine_dip"): on = True
         elif on and r2 > p("nine_dip_exit"): on = False
         nine["dip_on"] = on; full = full or on
     w_new = 1.0 if full else base
+    if roff: w_new = min(base, p("nine_cap")[1])
     def_new = deff
     if p("def_trend"):
         def_new = [t for t in deff if float(adj[t].iloc[-1]) >= float(adj[t].iloc[-p("def_sma"):].mean())] or ["BIL"]
@@ -222,20 +281,31 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
         nine["initialized"] = True
     # --- LDS: bullish-session swap (Fed day and optional calendar/dip days)
     ex, diag = lds_exposures(adj)
+    kmax = 1 if (p("lds_riskoff") and roff) else 3
+    def lds_targets(caps, vl):
+        tg = {t: c * vl for t, c in caps.items()}
+        if p("ndx_cap") is not None and tg.get("TQQQ", 0) > 0:
+            room = max(0.0, p("ndx_cap") * total_value(st, close) - st["sleeves"]["9SIG"]["holdings"].get("TQQQ", 0) * close["TQQQ"])
+            if tg["TQQQ"] > room: tg["UPRO"] = tg.get("UPRO", 0) + tg["TQQQ"] - room; tg["TQQQ"] = room
+        return tg
+    if p("lds_riskoff") and not (lds.get("swap") or {}).get("active") and st["last_date"] and bool(lds.get("delev")) != (kmax == 1):
+        vl = sleeve_value(st, "LDS", close)
+        set_targets(st, "LDS", lds_targets(implement(ex, kmax), vl), close, date, "LDS risk-off" if kmax == 1 else "LDS risk back on")
+        lds["delev"] = kmax == 1
     sw = lds.get("swap") or {}
     swapped_back = False
     if sw.get("active") and not bull:
-        caps = implement(ex); vl = sleeve_value(st, "LDS", close)
-        set_targets(st, "LDS", {t: c * vl for t, c in caps.items()}, close, date, "Swap ends: LDS positions restored")
+        caps = implement(ex, kmax); vl = sleeve_value(st, "LDS", close)
+        set_targets(st, "LDS", lds_targets(caps, vl), close, date, "Swap ends: LDS positions restored")
         lds["exposures"] = ex; lds["swap"] = dict(active=False); swapped_back = True
     if (lds_review_due(cal, date) or lds_force) and not swapped_back and not sw.get("active"):
-        caps = implement(ex); vl = sleeve_value(st, "LDS", close)
-        tg = {t: c * vl for t, c in caps.items()}
+        caps = implement(ex, kmax); vl = sleeve_value(st, "LDS", close)
+        tg = lds_targets(caps, vl)
         cur = {t: sh * close[t] for t, sh in st["sleeves"]["LDS"]["holdings"].items()}
         turn = sum(abs(tg.get(t, 0) - cur.get(t, 0)) for t in set(tg) | set(cur))
         if turn > P["lds_threshold"] * vl or lds_force:
             set_targets(st, "LDS", tg, close, date, "LDS rebalance"); lds["exposures"] = ex
-    if bull and not (lds.get("swap") or {}).get("active"):
+    if bull and not (lds.get("swap") or {}).get("active") and not (p("lds_riskoff") and roff):
         vl = sleeve_value(st, "LDS", close)
         f = p("swap_frac"); tg = defaultdict(float)
         for t, w in p("swap_asset"): tg[t] += w * vl * f
@@ -246,7 +316,12 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
     # --- bookkeeping
     tot = total_value(st, close)
     if st["spy_units"] is None: st["spy_units"] = st["start_capital"] / close["SPY"]
-    st["equity"].append(dict(date=str(date.date()), value=round(tot, 2), nine=round(sleeve_value(st, "9SIG", close), 2), lds=round(sleeve_value(st, "LDS", close), 2)))
+    ex_u = defaultdict(float)
+    for sl in st["sleeves"].values():
+        for t, sh in sl["holdings"].items():
+            if t in LEV_OF: a, L = LEV_OF[t]; ex_u[a] += sh * close[t] * L / tot
+            else: ex_u[t] += sh * close[t] / tot
+    st["equity"].append(dict(date=str(date.date()), value=round(tot, 2), nine=round(sleeve_value(st, "9SIG", close), 2), lds=round(sleeve_value(st, "LDS", close), 2), x=dict(ex_u)))
     if st.get("year_mark") is None: st["year_mark"] = (sleeve_value(st, "9SIG", close), sleeve_value(st, "LDS", close))
     st["prev_close"] = close; st["last_date"] = str(date.date())
     return ev
