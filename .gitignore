@@ -4,3 +4,6 @@ _old_v1.0/
 validation/
 *.tmp
 preview.md
+research/data/
+research/out/
+research/out_*.log
