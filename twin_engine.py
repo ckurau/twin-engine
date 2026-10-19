@@ -462,6 +462,27 @@ def next_fomc(cal, date):
         if len(prev) and prev[-1] < date: continue
     return None, None
 
+# Important dates shown on the dashboard (Overview > Important dates). Add or edit lines here: (date, what, why/how).
+REMINDERS = [
+    ("2026-10-26", "Go live: buy the paper account's positions in the Roth as MOC orders", "Use the share counts on the Positions tab so later orders match the dashboard."),
+    ("2026-10-27", "First live Fed-day swap: LDS sleeve into SOXL at the close", "Swap back at the close on Wed Oct 28."),
+    ("2026-10-30", "First monthly LDS review", "Then turn-of-month window through Wed Nov 4."),
+    ("2026-12-31", "First year-end 50/50 reset", "Also the 9Sig quarterly signal - expect several orders."),
+    ("2027-04-15", "Last day for 2026 Roth IRA contributions", "2026 limit about $7,500; 2027 contributions open Jan 1."),
+    ("2027-07-01", "Add the Fed's 2028 meeting dates to the engine", "The Fed publishes them each summer. Ask Claude, or edit FOMC_DATES in twin_engine.py."),
+    ("2027-10-05", "Renew the GitHub token for cron-job.org (expires Oct 19, 2027)", "New fine-grained token, this repo only, Actions read/write; paste it into both cron-job.org jobs. README 4 step 3b."),
+    ("2028-02-15", "Update the API version header in both cron-job.org jobs", "GitHub retires X-GitHub-Api-Version 2022-11-28 on Mar 10, 2028."),
+]
+
+def reminders(date):
+    """upcoming REMINDERS plus the automatic Fed-dates reminder, soonest first"""
+    out = [dict(date=d, what=w, note=n) for d, w, n in REMINDERS if d >= str(date.date())]
+    last = max(FOMC_DATES)
+    if not any("Fed's" in r["what"] for r in out):
+        out.append(dict(date=f"{last.year}-07-01", what=f"Add the Fed's {last.year + 1} meeting dates to the engine",
+                        note="The Fed publishes them each summer. Ask Claude, or edit FOMC_DATES in twin_engine.py."))
+    return sorted(out, key=lambda r: r["date"])
+
 def fomc_list_warning(date):
     future = [x for x in FOMC_DATES if x > date]
     if len(future) < 3:
@@ -604,7 +625,7 @@ def build_summary(st, adj, close, cal, demo=False):
                      rebalance_day=str(cal.upcoming(date, cal.is_rebalance_day, 1)[0].date()),
                      assets=[dict(sym=a, **{k: (round(v, 4) if isinstance(v, float) else v) for k, v in diag.get(a, {}).items()}) for a in P["lds_assets"]])),
         positions=positions, trades=list(reversed(st["trades"]))[:1500], equity=st["equity"], events=list(reversed(st["events"]))[:150],
-        next_actions=actions, params={k: (list(v) if isinstance(v, tuple) else v) for k, v in P.items()},
+        next_actions=actions, reminders=reminders(date), params={k: (list(v) if isinstance(v, tuple) else v) for k, v in P.items()},
     )
 
 def write_summary(sm, path=SUMMARY_PATH):

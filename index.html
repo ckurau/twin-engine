@@ -135,7 +135,7 @@ section.tab{scroll-margin-top:120px;display:flex;flex-direction:column;gap:14px;
 .list{display:flex;flex-direction:column}
 .li{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-top:1px solid var(--line)}
 .li:first-child{border-top:0;padding-top:2px}
-.li .when{font:600 12px var(--f-data);color:var(--fg2);min-width:58px;padding-top:1px}
+.li .when{font:600 12px var(--f-data);color:var(--fg2);min-width:58px;padding-top:1px;white-space:nowrap}
 .li .what{flex:1;min-width:0;font-size:14px}
 
 /* positions */
@@ -404,9 +404,18 @@ function renderOverview(){
     </div>
   </div>
 
+  ${datesCard()}
+
   <div class="card"><div class="h2">Activity log</div><div class="list">${D.events.slice(0, 10).map(e => `<div class="li"><div class="when">${dfmt(e.date)}</div><div class="what fg2">${esc(e.text)}</div></div>`).join("")}</div></div>`;
   $("#rangeSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; range = b.dataset.r; renderOverview(); });
   drawEquity();
+}
+function datesCard(){
+  const R = D.reminders || []; if (!R.length) return "";
+  const today = new Date().toLocaleDateString("en-CA", {timeZone: "America/New_York"});
+  const days = s => Math.round((new Date(s + "T12:00:00") - new Date(today + "T12:00:00")) / 864e5);
+  return `<div class="card"><div class="h2">Important dates</div><div class="list">${R.map(r => { const n = days(r.date), soon = n <= 30;
+    return `<div class="li"><div class="when">${dfmt(r.date, {month: "short", day: "numeric", year: "numeric"})}<div class="${soon ? "" : "muted"}" style="font-weight:500${soon ? ";color:var(--warn)" : ""}">${n < 0 ? "overdue" : n === 0 ? "today" : n === 1 ? "tomorrow" : "in " + n + "d"}</div></div><div class="what"><b>${esc(r.what)}</b><div class="muted" style="font-size:12.5px">${esc(r.note || "")}</div></div></div>`; }).join("")}</div></div>`;
 }
 function engineCard(c, k, name, val, w, rows, meter, meterLab){
   return `<div class="card engine ${c}">
