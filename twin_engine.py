@@ -30,14 +30,17 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 STATE_PATH = os.path.join(HERE, "state.json")
 SUMMARY_PATH = os.path.join(HERE, "summary.json")
 PREVIEW_PATH = os.path.join(HERE, "preview.json")
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 
 # ----------------------------------------------------------------------------- parameters (backtested values)
 P = dict(
     start_capital=20000.0,
     split_9sig=0.50,            # Twin Engine: 50% Modified 9Sig / 50% LDS
     rebalance_months=(12,),     # v1.3: reset the two engines to 50/50 at year end only (was every quarter end)
-    fomc_swap=True,             # v1.3: LDS sleeve held in TQQQ from the close before each scheduled Fed decision to the close of decision day
+    fomc_swap=True,             # v1.3: LDS sleeve swapped for one session on each scheduled Fed decision day (close before -> close of decision day)
+    fomc_asset="SOXL",          # v1.5: the Fed-day swap holds 3x semiconductors (v1.3: TQQQ)
+    lds_review="month",         # v1.5: LDS trend/risk review at the last close of each month (v1.3: every week)
+    dip_rsi2=20.0,              # v1.5: 9Sig dip boost - full TQQQ for the next session when QQQ's 2-day RSI < 20 and QQQ > its 200-day average
     # --- Modified 9Sig sleeve
     sig_rate=0.09,              # quarterly growth target for the TQQQ "growth" sub-sleeve
     w0_growth=0.60,             # 9Sig sleeve starts 60% growth / 40% defensive
@@ -55,7 +58,7 @@ P = dict(
     lds_vol_target=1.00,        # core risk parity scaled to 100% vol target -> capped by available leverage
     lds_overlay_vol=0.15,
     sma_days=210, cov_days=63,
-    lds_threshold=0.05,         # weekly rebalance only if total change > 5% of the sleeve
+    lds_threshold=0.05,         # LDS review trades only if total change > 5% of the sleeve
     # --- execution
     slippage_bps=2.0,
     min_order=25.0,             # ignore orders smaller than $25
@@ -68,6 +71,7 @@ ETF = {
     ("QQQ", 1): "QQQ", ("QQQ", 2): "QLD", ("QQQ", 3): "TQQQ", ("QQQ", -1): "PSQ", ("QQQ", -2): "QID", ("QQQ", -3): "SQQQ",
     ("TLT", 1): "TLT", ("TLT", 2): "UBT", ("TLT", 3): "TMF", ("TLT", -1): "TBF", ("TLT", -2): "TBT", ("TLT", -3): "TMV",
     ("GLD", 1): "GLD", ("GLD", 2): "UGL", ("GLD", -2): "GLL",
+    ("SOXX", 3): "SOXL",        # Fed-day swap only - not an LDS asset
 }
 LMAX_LONG = dict(SPY=3, QQQ=3, TLT=3, GLD=2)
 LMAX_SHORT = dict(SPY=3, QQQ=3, TLT=3, GLD=2)
@@ -75,7 +79,7 @@ NAMES = {
     "TQQQ": "3x Nasdaq-100", "UPRO": "3x S&P 500", "TMF": "3x 20+yr Treasuries", "UGL": "2x Gold",
     "SPXU": "-3x S&P 500", "SQQQ": "-3x Nasdaq-100", "TMV": "-3x 20+yr Treasuries", "GLL": "-2x Gold",
     "TLT": "20+yr Treasuries", "GLD": "Gold", "SPY": "S&P 500", "QQQ": "Nasdaq-100", "SSO": "2x S&P 500",
-    "QLD": "2x Nasdaq-100", "UBT": "2x 20+yr Treasuries", "SH": "-1x S&P 500", "SDS": "-2x S&P 500",
+    "QLD": "2x Nasdaq-100", "SOXL": "3x Semiconductors", "UBT": "2x 20+yr Treasuries", "SH": "-1x S&P 500", "SDS": "-2x S&P 500",
     "PSQ": "-1x Nasdaq-100", "QID": "-2x Nasdaq-100", "TBF": "-1x 20+yr Treasuries", "TBT": "-2x 20+yr Treasuries",
 }
 # Scheduled FOMC decision days (statement released ~2:00 PM ET). Source: federalreserve.gov.
@@ -154,6 +158,7 @@ class Calendar:
         return k < P["tom_after"]
     def is_fomc(self, d): return pd.Timestamp(d).normalize() in FOMC_DATES
     def is_pre_fomc(self, d): return self.is_fomc(self.next_day(d))
+    def is_lds_review(self, d): return self.is_month_end(d) if P["lds_review"] == "month" else self.is_week_end(d)
     def is_rebalance_day(self, d): return self.is_quarter_end(d) and d.month in P["rebalance_months"]
     def upcoming(self, d, pred, n=1):
         out, x = [], d
@@ -196,6 +201,17 @@ def vol_switch_raw(tqqq_adj: pd.Series):
     v = float(r.std(ddof=1) * math.sqrt(252)) if len(r) >= P["vol_lookback"] else float("nan")   # ddof=1 = backtest
     if not v or math.isnan(v): return 1.0, v
     return float(min(max((P["vol_target"] / v) ** P["vol_power"], 0.0), 1.0)), v
+
+def rsi2(px: pd.Series):
+    """2-day RSI (Wilder smoothing over the last 2 changes), as in the research backtest"""
+    r = px.diff().iloc[-3:]
+    up = r.clip(lower=0).ewm(alpha=0.5, adjust=False).mean().iloc[-1]; dn = (-r.clip(upper=0)).ewm(alpha=0.5, adjust=False).mean().iloc[-1]
+    return 100.0 if dn == 0 else float(100 - 100 / (1 + up / dn))
+
+def dip_signal(qqq_adj: pd.Series):
+    """(boost on?, RSI2, QQQ above its 200-day average?) at the last close"""
+    q = qqq_adj.dropna(); r = rsi2(q); up = float(q.iloc[-1]) > float(q.iloc[-200:].mean())
+    return (P["dip_rsi2"] is not None and up and r < P["dip_rsi2"]), r, up
 
 def _vol(r, n): return float(r.iloc[-n:].std(ddof=1) * math.sqrt(252))
 def _mom(px, months): k = 21 * months; return float(px.iloc[-1] / px.iloc[-1 - k] - 1) if len(px) > k else float("nan")
@@ -376,11 +392,15 @@ def step(st, date, adj: pd.DataFrame, close: dict, cal: Calendar, divs: dict | N
     raw, v20 = vol_switch_raw(adj["TQQQ"].dropna())
     if abs(raw - nine["w_base"]) > P["vol_band"] or not nine["initialized"]: nine["w_base"] = raw
     tomorrow = cal.next_day(date); tom = cal.is_tom(tomorrow)
-    w_new = 1.0 if tom else nine["w_base"]
+    dip, r2, up200 = dip_signal(adj["QQQ"])
+    boost = "TOM" if tom else ("Dip" if dip else None)
+    w_new = 1.0 if boost else nine["w_base"]
     if abs(w_new - nine["w"]) > 1e-9 or nine_trade or contributed_today:
         why = []
         if abs(w_new - nine["w"]) > 1e-9:
-            why.append("TOM boost on" if tom and nine["w"] < 1 else ("TOM boost off" if (not tom and nine["w"] == 1 and nine["w_base"] < 1 and cal.is_tom(date)) else f"Vol switch {nine['w']:.0%}->{w_new:.0%}"))
+            if boost and w_new > nine["w"]: why.append(f"{boost} boost on")
+            elif nine.get("boost") and not boost: why.append(f"{nine['boost']} boost off")
+            else: why.append(f"Vol switch {nine['w']:.0%}->{w_new:.0%}")
         if q_end: why.append("9Sig quarterly signal")
         if contributed_today and not q_end: why.append("Invest contribution")
         if not nine["initialized"]: why = ["Initial allocation"]
@@ -391,7 +411,8 @@ def step(st, date, adj: pd.DataFrame, close: dict, cal: Calendar, divs: dict | N
         tg = {"TQQQ": tq}; tg.update({t: dfn / len(P["defensive"]) for t in P["defensive"]})
         set_targets(st, "9SIG", tg, close, date, " + ".join(why) or "9Sig rebalance")
         nine["initialized"] = True
-    nine["vol20"] = v20; nine["raw"] = raw; nine["tom_tomorrow"] = tom
+    if dip and not tom and not nine.get("boost"): ev.append(f"Dip boost: QQQ 2-day RSI {r2:.0f} < {P['dip_rsi2']:.0f} in an uptrend -> TQQQ at full size for {tomorrow:%a %b %d}")
+    nine["vol20"] = v20; nine["raw"] = raw; nine["tom_tomorrow"] = tom; nine["boost"] = boost; nine["rsi2"] = r2; nine["qqq_up"] = up200
     # --- LDS: FOMC swap back (the day after entry = decision day, or later if a run was missed)
     ex, diag = lds_exposures(adj)
     lds["diag"] = diag
@@ -403,24 +424,25 @@ def step(st, date, adj: pd.DataFrame, close: dict, cal: Calendar, divs: dict | N
         lds["exposures"] = ex; lds["last_rebalance"] = str(date.date()); lds["last_check"] = str(date.date()); lds["target_exposures"] = ex
         lds["fomc_swap"] = dict(active=False, last=swap.get("decision")); swapped_back = True
         ev.append("Fed-day swap ended: LDS sleeve back to its trend/risk positions")
-    # --- LDS weekly check (last session of the week) or first day
-    if (cal.is_week_end(date) or lds_force) and not swapped_back:
+    # --- LDS review (last session of the month; v1.3: of the week) or first day
+    if (cal.is_lds_review(date) or lds_force) and not swapped_back:
         caps = implement(ex); vl = sleeve_value(st, "LDS", close)
         tg = {t: c * vl for t, c in caps.items()}
         cur = {t: sh * close[t] for t, sh in st["sleeves"]["LDS"]["holdings"].items()}
         turn = sum(abs(tg.get(t, 0) - cur.get(t, 0)) for t in set(tg) | set(cur))
         if turn > P["lds_threshold"] * vl or lds_force:
-            set_targets(st, "LDS", tg, close, date, "Initial allocation" if lds_force else "LDS weekly rebalance")
+            set_targets(st, "LDS", tg, close, date, "Initial allocation" if lds_force else "LDS monthly rebalance")
             lds["exposures"] = ex; lds["last_rebalance"] = str(date.date()); ev.append(f"LDS rebalanced (turnover {turn / vl:.0%})")
         else:
-            ev.append(f"LDS weekly check: turnover {turn / vl:.1%} < 5%, no trade")
+            ev.append(f"LDS monthly check: turnover {turn / vl:.1%} < 5%, no trade")
         lds["last_check"] = str(date.date()); lds["target_exposures"] = ex
-    # --- LDS: FOMC swap in (close before a scheduled Fed decision): whole LDS sleeve into TQQQ for one day
+    # --- LDS: FOMC swap in (close before a scheduled Fed decision): whole LDS sleeve into the swap ETF for one day
     if P["fomc_swap"] and cal.is_pre_fomc(date) and not (lds.get("fomc_swap") or {}).get("active"):
         vl = sleeve_value(st, "LDS", close); dec = cal.next_day(date)
-        set_targets(st, "LDS", {"TQQQ": vl}, close, date, f"Fed-day swap: LDS into TQQQ for the Fed decision {dec:%b %d}")
+        fa = P["fomc_asset"]
+        set_targets(st, "LDS", {fa: vl}, close, date, f"Fed-day swap: LDS into {fa} for the Fed decision {dec:%b %d}")
         lds["fomc_swap"] = dict(active=True, entered=str(date.date()), decision=str(dec.date()))
-        ev.append(f"Fed-day swap: LDS sleeve moved into TQQQ for the Fed decision on {dec:%a %b %d}")
+        ev.append(f"Fed-day swap: LDS sleeve moved into {fa} for the Fed decision on {dec:%a %b %d}")
     # --- bookkeeping
     tot = total_value(st, close)
     if st["spy_units"] is None: st["spy_units"] = st["start_capital"] / close["SPY"]
@@ -460,7 +482,7 @@ def build_summary(st, adj, close, cal, demo=False):
         tw *= (eq.value.iloc[i] - flow) / eq.value.iloc[i - 1]
     cagr = tw ** (365.25 / days) - 1 if days > 180 else None
     nine, lds = st["nine"], st["lds"]
-    nxt_week = cal.upcoming(date, cal.is_week_end, 1)[0]
+    nxt_week = cal.upcoming(date, cal.is_lds_review, 1)[0]
     nxt_q = cal.upcoming(date, cal.is_quarter_end, 1)[0]
     tom_start = cal.upcoming(date, lambda d: cal.is_tom(cal.next_day(d)) and not cal.is_tom(d), 1)[0]
     tom_end = cal.upcoming(tom_start, lambda d: cal.is_tom(d) and not cal.is_tom(cal.next_day(d)), 1)[0]
@@ -486,6 +508,8 @@ def build_summary(st, adj, close, cal, demo=False):
                     tom_txt = f"Turn-of-month boost: held at full size through the close of {tom_end:%a %b %d}, then back to {nine['w_base']:.0%}. "
                 else:
                     tom_txt = f"Next turn-of-month boost: to full size at close {tom_start:%a %b %d}, back to normal size at close {tom_end:%a %b %d}. "
+                if nine.get("boost") == "Dip": tom_txt = f"Dip boost on: full size for one session (QQQ 2-day RSI {nine.get('rsi2', 0):.0f}). " + tom_txt
+                elif nine["w_base"] < 0.999: tom_txt += f"Dip boost: full size for a session when QQQ's 2-day RSI closes below {P['dip_rsi2']:.0f} while QQQ is above its 200-day average. "
                 _t, _p = P["vol_target"], P["vol_power"]
                 exit_rule = (f"Size set daily by the volatility switch: 20-day vol {v20:.0%} vs {_t:.0%} target (full size at <={_t:.0%}, about half at {_t*2**(1/_p):.0%}, near zero above {_t*10**(1/_p):.0%}); now {nine['w_base']:.0%} of the growth sub-sleeve. "
                              + tom_txt + f"Quarterly 9Sig check at close {nxt_q:%a %b %d}: growth sub-sleeve target ${q_target:,.0f}.")
@@ -494,10 +518,10 @@ def build_summary(st, adj, close, cal, demo=False):
                 role = "9Sig defensive reserve"
                 exit_rule = f"Funds TQQQ buys when the vol switch re-risks or at the quarterly signal ({nxt_q:%b %d}). No price exit."
                 review = str(nxt_q.date())
-            elif tk == "TQQQ" and (lds.get("fomc_swap") or {}).get("active"):
+            elif tk == P["fomc_asset"] and (lds.get("fomc_swap") or {}).get("active"):
                 dec = pd.Timestamp(lds["fomc_swap"]["decision"])
                 role = "Fed-day swap (LDS sleeve)"
-                exit_rule = (f"The whole LDS sleeve is parked in TQQQ for the Fed decision on {dec:%a %b %d} (statement ~2:00 PM ET). "
+                exit_rule = (f"The whole LDS sleeve is parked in {tk} for the Fed decision on {dec:%a %b %d} (statement ~2:00 PM ET). "
                              f"Sold at that day's close; the LDS trend/risk positions are bought back at the same close.")
                 review = str(dec.date())
             else:
@@ -505,15 +529,15 @@ def build_summary(st, adj, close, cal, demo=False):
                 side = "SHORT (inverse ETF)" if any(t == tk and L < 0 for (a, L), t in ETF.items()) else "LONG"
                 if side.startswith("SHORT"):
                     role = f"LDS trend overlay — short {und}"
-                    exit_rule = f"Held while {und}'s blended 1/3/6/12-month momentum is negative (now {d.get('mom_blend', float('nan')):+.1%}). Reviewed at close {nxt_week:%a %b %d}."
+                    exit_rule = f"Held while {und}'s blended 1/3/6/12-month momentum is negative (now {d.get('mom_blend', float('nan')):+.1%}). Reviewed at the monthly close {nxt_week:%a %b %d}."
                 elif d.get("trend") == "UP":
                     role = f"LDS core — {und}"
                     exit_rule = (f"Core position: held while {und} closes above its 210-day average (now {d.get('pct_vs_sma', float('nan')):+.1%} vs avg ${d.get('sma', float('nan')):,.2f}). "
-                                 f"Exits/resizes at the weekly review, close {nxt_week:%a %b %d}, if the trend breaks or weights shift >5%.")
+                                 f"Exits/resizes at the monthly review, close {nxt_week:%a %b %d}, if the trend breaks or weights shift >5%.")
                 else:
                     role = f"LDS overlay — {und} momentum"
                     exit_rule = (f"Core trend is OFF ({und} {d.get('pct_vs_sma', float('nan')):+.1%} vs its 210-day average), so only the small momentum overlay holds it: "
-                                 f"long while blended 1/3/6/12-month momentum is positive (now {d.get('mom_blend', float('nan')):+.1%}). Core returns if {und} closes above ${d.get('sma', float('nan')):,.2f} at a weekly review (next {nxt_week:%a %b %d}).")
+                                 f"long while blended 1/3/6/12-month momentum is positive (now {d.get('mom_blend', float('nan')):+.1%}). Core returns if {und} closes above ${d.get('sma', float('nan')):,.2f} at a monthly review (next {nxt_week:%a %b %d}).")
                 review = str(nxt_week.date())
             positions.append(dict(
                 ticker=tk, name=NAMES.get(tk, tk), sleeve=sl, underlying=und, shares=round(sh, 4), price=round(close[tk], 4),
@@ -530,7 +554,7 @@ def build_summary(st, adj, close, cal, demo=False):
                                              role="Uninvested cash", exit_rule="", next_review="", shares=None, price=None, pl=0, pl_pct=0, lots=[]))
     realized = sum(t.get("realized_pl", 0) for t in st["trades"])
     unreal = sum(p.get("pl", 0) for p in positions)
-    actions = [dict(date=str(nxt_week.date()), what="LDS weekly review (trend + risk sizing) at the close")]
+    actions = [dict(date=str(nxt_week.date()), what="LDS monthly review (trend + risk sizing) at the close")]
     if nine["w_base"] < 0.999:
         if in_tom_now: actions.append(dict(date=str(tom_end.date()), what="Turn-of-month boost ends: TQQQ back to vol-switch size at the close"))
         else: actions.append(dict(date=str(tom_start.date()), what="Turn-of-month boost: TQQQ to full size at the close"))
@@ -538,9 +562,9 @@ def build_summary(st, adj, close, cal, demo=False):
     fs = lds.get("fomc_swap") or {}
     f_dec, f_entry = next_fomc(cal, date)
     if fs.get("active"):
-        actions.append(dict(date=fs["decision"], what="Fed-day swap ends: sell the LDS sleeve's TQQQ and restore LDS positions at the close"))
+        actions.append(dict(date=fs["decision"], what=f"Fed-day swap ends: sell the LDS sleeve's {P['fomc_asset']} and restore LDS positions at the close"))
     elif f_dec is not None and P["fomc_swap"]:
-        actions.append(dict(date=str(f_entry.date()), what=f"Fed-day swap: move the LDS sleeve into TQQQ at the close (Fed decision {f_dec:%a %b %d})"))
+        actions.append(dict(date=str(f_entry.date()), what=f"Fed-day swap: move the LDS sleeve into {P['fomc_asset']} at the close (Fed decision {f_dec:%a %b %d})"))
     warn = fomc_list_warning(date)
     if st["contrib_monthly"]:
         fm = cal.upcoming(date, cal.is_first_session_of_month, 1)[0]
@@ -570,10 +594,12 @@ def build_summary(st, adj, close, cal, demo=False):
                       defensive=round(nine["B"], 2), tqqq_weight=round(nine["w"] * 100, 1), base_weight=round(nine["w_base"] * 100, 1),
                       vol20=round(v20 * 100, 1) if v20 == v20 else None, tom_active=in_tom_now, tom_start=str(tom_start.date()),
                       tom_end=str(tom_end.date()), quarter_end=str(nxt_q.date()), quarter_target=round(q_target, 2),
-                      quarter_gap=round(q_target - nine["S"], 2), skips_left=nine["skips"]),
+                      quarter_gap=round(q_target - nine["S"], 2), skips_left=nine["skips"],
+                      dip_active=nine.get("boost") == "Dip", rsi2=round(nine["rsi2"], 1) if nine.get("rsi2") is not None else None,
+                      qqq_uptrend=nine.get("qqq_up"), dip_threshold=P["dip_rsi2"]),
             lds=dict(value=float(eq.lds.iloc[-1]), weight=round(eq.lds.iloc[-1] / tot * 100, 2), exposures={k: round(v, 3) for k, v in exl.items()},
                      gross=round(sum(abs(e) for e in exl.values()), 2), last_rebalance=lds.get("last_rebalance"), next_review=str(nxt_week.date()),
-                     fomc_active=bool(fs.get("active")), fomc_decision=(fs.get("decision") if fs.get("active") else (str(f_dec.date()) if f_dec is not None else None)),
+                     fomc_active=bool(fs.get("active")), fomc_asset=P["fomc_asset"], review=P["lds_review"], fomc_decision=(fs.get("decision") if fs.get("active") else (str(f_dec.date()) if f_dec is not None else None)),
                      fomc_entry=(fs.get("entered") if fs.get("active") else (str(f_entry.date()) if f_entry is not None else None)),
                      rebalance_day=str(cal.upcoming(date, cal.is_rebalance_day, 1)[0].date()),
                      assets=[dict(sym=a, **{k: (round(v, 4) if isinstance(v, float) else v) for k, v in diag.get(a, {}).items()}) for a in P["lds_assets"]])),
@@ -672,7 +698,7 @@ def validate(adj, close, divs, spl, years=3.0, capital=20000.0, outdir=None):
         if cal.is_rebalance_day(d) and st["equity"][-1]["value"] > 0:
             share = st["equity"][-1]["nine"] / st["equity"][-1]["value"]
             if abs(share - P["split_9sig"]) > 0.02: issues.append(f"{d.date()} year-end split off target: 9Sig {share:.1%}")
-        if P["fomc_swap"] and cal.is_pre_fomc(d) and set(st["sleeves"]["LDS"]["holdings"]) - {"TQQQ"}:
+        if P["fomc_swap"] and cal.is_pre_fomc(d) and set(st["sleeves"]["LDS"]["holdings"]) - {P["fomc_asset"]}:
             issues.append(f"{d.date()} FOMC swap did not open (LDS holds {sorted(st['sleeves']['LDS']['holdings'])})")
         if cal.is_fomc(d) and (st["lds"].get("fomc_swap") or {}).get("active"):
             issues.append(f"{d.date()} FOMC swap did not close on decision day")
@@ -734,6 +760,10 @@ def preview(a):
     mins_left = (close_t - now_et).total_seconds() / 60
     if a.window and not (5 <= mins_left <= 65):
         print(f"Outside the preview window ({mins_left:.0f} min to the {close_t:%H:%M} ET close) - skipping."); return None
+    if a.window and os.path.exists(PREVIEW_PATH):             # two schedulers (cron-job.org + GitHub backup): one preview a day
+        with open(PREVIEW_PATH) as f: old = json.load(f)
+        if old.get("date") == str(today) and old.get("status") in ("orders", "no_orders"):
+            print(f"Already previewed today at {old.get('prices_as_of')} - skipping."); return None
     out["close_time"] = close_t.strftime("%H:%M")
     adj, close, divs, spl = fetch_yf()
     if close.index[-1].date() != today:                      # no row for today yet: build it from 1-minute bars

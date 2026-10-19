@@ -1,5 +1,6 @@
 name: Daily run (after the close)
 # Books today's paper fills at the real closing prices and updates the dashboard.
+# Started on time by cron-job.org (4:20 PM New York time); the UTC schedule is a backup.
 # Two UTC times cover both DST offsets; the engine ignores today's prices until 4:15 PM ET
 # and a second run on the same day changes nothing, so running twice is safe.
 on:
@@ -32,5 +33,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add state.json summary.json
-          if git diff --cached --quiet state.json; then echo "No new close booked."; exit 0; fi
+          if git diff --cached --quiet state.json && [ "${{ github.event_name }}" = "schedule" ]; then echo "No new close booked."; exit 0; fi
+          git diff --cached --quiet && { echo "Nothing changed."; exit 0; }
           git commit -m "Daily run $(TZ=America/New_York date +%F)"; git pull --rebase; git push

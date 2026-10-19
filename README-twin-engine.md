@@ -11,21 +11,25 @@
 ## 1. What you're running, in one paragraph
 
 Two independent "engines" share one account and are reset to 50/50 at each year end.
-**Engine 1 – Modified 9Sig** holds TQQQ in a *growth* sub-sleeve and TLT + GLD in a *defensive* reserve. Every quarter the growth sub-sleeve must grow 9%: excess is sold into the reserve, shortfalls are bought from it. Inside the growth sub-sleeve a **volatility switch** shrinks TQQQ when Nasdaq volatility spikes, and a **turn-of-month (TOM)** rule holds full TQQQ around month-end.
-**Engine 2 – LDS** checks S&P 500, Nasdaq-100, long Treasuries and gold every Friday; it holds the ones above their 210-day average, sized by inverse volatility and levered up with 3x/2x ETFs (UPRO, TQQQ, TMF, UGL), plus a small long/short momentum overlay (can use SPXU, SQQQ, TMV, GLL). On each scheduled **Fed decision day** (8 a year) the whole LDS sleeve is held in TQQQ for that one day.
+**Engine 1 – Modified 9Sig** holds TQQQ in a *growth* sub-sleeve and TLT + GLD in a *defensive* reserve. Every quarter the growth sub-sleeve must grow 9%: excess is sold into the reserve, shortfalls are bought from it. Inside the growth sub-sleeve a **volatility switch** shrinks TQQQ when Nasdaq volatility spikes, a **turn-of-month (TOM)** rule holds full TQQQ around month-end, and a **dip boost** holds full TQQQ for a session after a sharp short-term drop in an uptrend.
+**Engine 2 – LDS** checks S&P 500, Nasdaq-100, long Treasuries and gold at each month-end close; it holds the ones above their 210-day average, sized by inverse volatility and levered up with 3x/2x ETFs (UPRO, TQQQ, TMF, UGL), plus a small long/short momentum overlay (can use SPXU, SQQQ, TMV, GLL). On each scheduled **Fed decision day** (8 a year) the whole LDS sleeve is held in SOXL (3x semiconductors) for that one day.
 
 ### Expected behaviour (backtest, $20k start)
 
 | | Final equity | CAGR | Max drawdown |
 |---|---|---|---|
-| Paper engine replay v1.3, 2000 → Sep 2026 | $38.2M | 32.7% | −43% |
-| Paper engine replay v1.3, 2007 → Sep 2026 | $13.5M | 39.2% | −38% |
-| (v1.2 without the Fed-day swap / yearly reset, 2000 → 2026) | $28.7M | 31.3% | −51% |
+| **v1.5**, 2000 → Oct 2026 | $64.8M | 35.2% | −40% |
+| **v1.5**, 2007 → Oct 2026 | $16.9M | 40.6% | −40% |
+| **v1.5**, 2010 → Oct 2026 (real ETF prices only) | $3.3M | 36.0% | −40% |
+| v1.3 (same data), 2000 → Oct 2026 | $25.3M | 30.6% | −52% |
+| v1.3 (same data), 2010 → Oct 2026 | — | 34.0% | −39% |
 | SPY, 2000 → Sep 2026 | $165k | 8.2% | −55% |
+
+Rows marked "same data" come from the Idea Lab III harness (`research/`), which replays the production engine over a rebuilt 1998–2026 price history. Before 2010 the leveraged ETFs are reconstructed from their indexes, and most of v1.5's 2000–2026 lead comes from 2000 itself; the fair estimate of the improvement is the real-ETF era: **about +2 points a year**, with a drawdown about 1 point deeper.
 
 **Realistic live expectation:** ~20–25%/yr with a 45–60% drawdown at some point.
 
-### 20-year projection (v1.3, $20,000 start on Oct 16, 2026)
+### 20-year projection (v1.3, $20,000 start on Oct 16, 2026; not re-run for v1.5 — treat as a conservative reference)
 
 Monte Carlo: 20,000 paths that resample real 12-month blocks of the v1.3 engine's monthly returns (2000–2026, 0.05% slippage). **Realistic** = backtest returns minus 8 points a year (future edge decay, real-world fills). **Conservative** = minus 15 points. Values are account balances at each anniversary.
 
@@ -54,7 +58,7 @@ Monte Carlo: 20,000 paths that resample real 12-month blocks of the v1.3 engine'
 
 In the realistic case, 41% of paths have a drop worse than −50% at some point (median worst drop −48%), and 0.1% end below $20,000. Without any haircut (the backtest as-is), the median 20-year result is $6.2M. This is a range, not a promise.
 
-Replays use 0.05% slippage per fill (stricter than the engine's default 0.02%). Typical year: ~55–60 trade days, ~235 orders. 2000–2026: beat SPY in 20 of 27 calendar years, worst year −36% (2022).
+Replays use 0.05% slippage per fill (stricter than the engine's default 0.02%). Typical year with v1.5: ~40 trade days (v1.3: 55–60). Worst calendar year in the v1.5 replay: −33% (2022).
 
 ---
 
@@ -76,19 +80,22 @@ All signals use **closing prices**. In paper trading all orders fill at that day
 | Volatility switch (daily) | vol20 = annualized std-dev of TQQQ's last 20 daily returns. TQQQ share of S = min(1, (0.80 / vol20)^10). Only change it if the new value differs by > 5 points. Remainder of S → TLT/GLD |
 | Rough switch levels | vol20 ≤ 80% → 100% • 86% → ~50% • 90% → ~31% • ≥ 100% → ~10% |
 | Turn-of-month | Hold TQQQ at 100% of S on the **last trading day of the month and the first 3 trading days** of the next (buy at the close the day before; return to switch size at the close of the 3rd day). Only matters when the switch is below 100% |
+| Dip boost (v1.5) | If QQQ's **2-day RSI closes below 20** while QQQ is **above its 200-day average**, hold TQQQ at 100% of S for the next session (re-checked every close). Only matters when the switch is below 100% |
 
-### 2.3 Engine 2 — LDS (checked at the close of the last trading day of each week)
+### 2.3 Engine 2 — LDS (checked at the close of the last trading day of each month; v1.3: each week)
 1. **Trend:** for SPY, QQQ, TLT, GLD — is today's close ≥ its 210-day simple average?
 2. **Core (85%)**: uptrend assets get weight ∝ 1 / (63-day volatility). Scale the mix so its expected volatility = 100%/yr; the scale is capped by the leverage that exists (see step 4), so in practice it means "as much leverage as the ETFs allow."
 3. **Overlay (15%)**: each asset long if the average of its 1-, 3-, 6- and 12-month returns > 0, short if < 0; weight ∝ 1/vol, scaled to 15% vol.
 4. **Implement** combined exposures with the lowest common leverage tier that fits in 100% of the sleeve: 1x (SPY, QQQ, TLT, GLD) → 2x (SSO, QLD, UBT, UGL) → 3x (UPRO, TQQQ, TMF; gold max 2x UGL). Shorts use inverse ETFs (SH/SDS/SPXU, PSQ/QID/SQQQ, TBF/TBT/TMV, GLL). If even max leverage doesn't fit, everything is scaled down.
 5. **Trade only if** the total change across positions is > 5% of the sleeve.
-6. **Fed-day swap (v1.3):** at the close of the trading day **before** each scheduled FOMC decision, sell the whole LDS sleeve and buy TQQQ. At the close of **decision day**, sell the TQQQ and buy the normal LDS positions (fresh weekly signal). The weekly check is skipped that day because the sleeve was just rebuilt. Engine 1 is not affected. The dates are listed in `FOMC_DATES` in `twin_engine.py` (through Dec 2027). The Fed publishes next year's schedule each summer: add it once a year. The dashboard shows an "Action needed" banner when fewer than 3 dates are left.
+6. **Fed-day swap (v1.3; SOXL since v1.5):** at the close of the trading day **before** each scheduled FOMC decision, sell the whole LDS sleeve and buy **SOXL** (3x semiconductors; v1.3 used TQQQ). At the close of **decision day**, sell the SOXL and buy the normal LDS positions (fresh signal). A month-end review falling on that day is skipped because the sleeve was just rebuilt. Engine 1 is not affected. The dates are listed in `FOMC_DATES` in `twin_engine.py` (through Dec 2027). The Fed publishes next year's schedule each summer: add it once a year. The dashboard shows an "Action needed" banner when fewer than 3 dates are left.
+
+   Why SOXL (v1.5): semiconductors have a higher beta, so they capture more of the Fed-day drift. Real SOXL averaged +1.11% on decision days since 2010 vs +0.65% for TQQQ; its worst decision day was −16% (TQQQ −10.8%). Because the LDS sleeve is half the account, the account's worst day in the replay did not get worse (−12.2% vs −12.3%).
 
    Why: Nasdaq rose on Fed decision days far more often than on normal days (TQQQ +0.97% average vs +0.12%, 60% up days, 1999–2026; first documented by Lucca & Moench, 2015). With costs it added +1.4 points of CAGR from 2000 and cut the max drawdown by ~7 points. It helped in both halves of history and in every 10-year window's drawdown. Most of the gain came in 2007–12 and 2020–26. If your fills cost more than ~0.10% per side, the CAGR gain disappears but the drawdown benefit remains.
 
 ### 2.4 What does NOT exist (on purpose)
-No stop-losses, no profit targets, no discretionary overrides. Every exit comes from the rules above. About 100 other ideas tested (crash pauses, VIX sizing, put hedges, trend filters, Turtle/PTJ/Livermore rules, overnight trading, sell-in-May, extra assets, Bitcoin, more leverage, etc.) either failed walk-forward validation or only added return by adding leverage. The futures-based ones (LDS up to 5x, volatility-managed leverage) need $25k+ and a futures-approved IRA, and carry 1987-crash risk. They are parked for now.
+No stop-losses, no profit targets, no discretionary overrides. Every exit comes from the rules above. About 255 other ideas tested (100 in the v1.3 lab, 155 in Idea Lab III) (crash pauses, VIX sizing, put hedges, trend filters, Turtle/PTJ/Livermore rules, overnight trading, sell-in-May, extra assets, Bitcoin, more leverage, etc.) either failed walk-forward validation or only added return by adding leverage. The futures-based ones (LDS up to 5x, volatility-managed leverage) need $25k+ and a futures-approved IRA, and carry 1987-crash risk. They are parked for now.
 
 ---
 
@@ -115,7 +122,7 @@ Everything runs on GitHub's servers. No PC has to be on.
 | **Start account (once)** | Manual | Opens the paper account at the close of the start date |
 | **Validate engine** | Manual | Replays the last 3 years of real prices in a scratch folder and runs the checks (§5a) |
 
-GitHub cron runs in UTC, so each job is scheduled at both daylight-saving offsets; the engine checks the NYSE calendar (holidays, early closes) and the extra runs do nothing. GitHub can start scheduled jobs 10–30 minutes late. If the preview hasn't arrived by 12:30 PM PT, open the repo in the GitHub app → Actions → **Preview orders** → **Run workflow**; it runs immediately.
+**Timing:** GitHub's own scheduler turned out to be unreliable (on Oct 19, 2026 it started the previews ~2 hours late and skipped other runs), so the jobs are started on time by **cron-job.org**, a free external timer that calls GitHub's "run workflow" API in New York time (DST handled). GitHub's own UTC schedule stays on as a backup: the engine checks the NYSE calendar (holidays, early closes), a second preview on the same day is skipped, and a second daily run changes nothing. If the preview hasn't arrived by 12:30 PM PT, open the repo in the GitHub app → Actions → **Preview orders** → **Run workflow**; it runs immediately.
 
 ---
 
@@ -124,6 +131,10 @@ GitHub cron runs in UTC, so each job is scheduled at both daylight-saving offset
 1. **GitHub account and repo.** Create a repo named `twin-engine` and upload these files (or push them with git). *Free GitHub Pages requires a public repo*: anyone with the link can see the paper account. Fine for paper trading; before real money, either upgrade to GitHub Pro (~$4/mo, private repo with Pages) or accept that the page shows your balance.
 2. **Pages:** Settings → Pages → *Deploy from a branch* → `main` / `(root)`. The dashboard lives at `https://<user>.github.io/twin-engine/`.
 3. **Actions permissions:** Settings → Actions → General → *Workflow permissions* → **Read and write**. (The jobs commit `summary.json` / `preview.json` back to the repo.)
+3b. **On-time trigger (cron-job.org):** create a fine-grained GitHub token (Settings → Developer settings → Fine-grained tokens) with access to **only this repo** and **Actions: Read and write**. At cron-job.org create two jobs, time zone **America/New_York**, Monday–Friday, method **POST**, headers `Accept: application/vnd.github+json`, `Authorization: Bearer <token>`, `X-GitHub-Api-Version: 2022-11-28`:
+   - Preview — 12:15 and 15:15 → `https://api.github.com/repos/<user>/twin-engine/actions/workflows/preview.yml/dispatches`, body `{"ref":"main","inputs":{"window":"true"}}`
+   - Daily run — 16:20 → `.../workflows/daily.yml/dispatches`, body `{"ref":"main"}`
+   A successful call returns HTTP 204. The token expires (max 1 year): renew it and paste the new one into both jobs.
 4. **Validate:** Actions → **Validate engine** → Run workflow. It must end in PASS; the report is on the run page.
 5. **Open the account:** Actions → **Start account (once)** → Run workflow (defaults: start 2026-10-16, $20,000, $200/month, whole shares). The account opens at the real close of the start date.
 6. **Phone:** open the dashboard → Share → **Add to Home Screen**. Install the GitHub app and allow notifications (order days open an issue that mentions you).
@@ -131,7 +142,7 @@ GitHub cron runs in UTC, so each job is scheduled at both daylight-saving offset
 ### Daily routine (2 minutes)
 - ~12:20 PM PT on order days: notification / **Place before the close** card on the dashboard → enter each order in thinkorswim as **MOC** (market-on-close).
 - After the close: glance at **Today's moves** and **Next actions**.
-- Once a week (after Friday's run): Signals tab — which LDS assets are in trend.
+- Once a month (after the month-end run): Signals tab — which LDS assets are in trend.
 - Fed days: the LDS sleeve shows as one TQQQ position for one day. That is the Fed-day swap, not an error.
 - If a job fails, GitHub emails you. Re-run it from the Actions tab; nothing is saved on a failed run.
 
@@ -144,11 +155,11 @@ The preview is an estimate from prices ~45 minutes before the close. If prices m
 | When | What |
 |---|---|
 | **Sat–Sun Oct 17–18** | Set up the repo, Pages and permissions (§4 steps 1–3). Run **Validate engine** (must PASS) and **Start account (once)**. Decide how to fund the Roth (the 2026 contribution limit is about $7,500, so $20k needs an existing Roth balance or a rollover) and start the transfer. In thinkorswim: confirm MOC orders and their cutoff, and accept the leveraged/inverse ETF disclosure if asked. Read §2 and §7 |
-| **Mon–Fri Oct 19–23** | Dry run: on order days the preview arrives ~12:15–12:30 PM PT. Enter the orders in thinkorswim without sending them (or in paperMoney). After the close, compare with the daily run. Friday Oct 23 = first weekly LDS rebalance |
+| **Mon–Fri Oct 19–23** | Dry run: on order days the preview arrives ~12:15–12:30 PM PT. Enter the orders in thinkorswim without sending them (or in paperMoney). After the close, compare with the daily run. v1.5: no weekly LDS rebalance any more; dip-boost days can bring TQQQ orders |
 | **Mon Oct 26** | Go live: place the starting allocation as MOC orders |
-| **Tue Oct 27** | First live Fed-day swap: LDS sleeve into TQQQ at the close |
+| **Tue Oct 27** | First live Fed-day swap: LDS sleeve into SOXL at the close |
 | **Wed Oct 28** | Fed decision: swap back at the close |
-| **Fri Oct 30 – Wed Nov 4** | First turn-of-month window plus the Friday LDS review. Check every fill against the dashboard |
+| **Fri Oct 30 – Wed Nov 4** | First turn-of-month window plus the first monthly LDS review (Fri Oct 30). Check every fill against the dashboard |
 | **Fri Nov 27** | Early close (1:00 PM ET / 10:00 AM PT): the preview comes ~9:15 AM PT |
 | **Dec 31** | First year-end 50/50 reset |
 | **Each summer** | Add the Fed's next-year meeting dates to `FOMC_DATES` (edit `twin_engine.py` in the GitHub web editor) |
@@ -272,6 +283,7 @@ python twin_engine.py validate [--years 3]
 |---|---|---|
 | 1.0 | Oct 2026 | Initial paper-trading release: 50/50 Twin Engine + TOM. Engine replay matches backtest (33.9% vs 35.0% CAGR, −48.4% vs −48.4% max DD, 2007–2026) |
 | 1.1 | Oct 2026 | Volatility switch target raised 70% → 80% (larger TQQQ position in the 9Sig sleeve). Walk-forward out of sample: 35.1% vs 34.7% CAGR, −51.5% vs −53.3% max DD. Across 18 start years (2000–2017, 10-year windows): higher CAGR in 16, shallower drawdown in 13. Weaker for starts from 2013 on (drawdowns ~2–3 points deeper in 2022). Replay 2007–26: 36.4% CAGR, −44.1% max DD |
+| 1.5.0 | Oct 19, 2026 | Idea Lab III (155 ideas, production engine over 1998–2026): three changes adopted together: (1) Fed-day swap into **SOXL** instead of TQQQ, (2) LDS review **monthly** instead of weekly (~15 fewer trade days a year), (3) 9Sig **dip boost** (QQQ 2-day RSI < 20 in an uptrend → full TQQQ next session). 35.2% / −40% vs 30.6% / −52% for v1.3 on the same data (2000–26); 2010–26 with real ETFs 36.0% / −40% vs 34.0% / −39%. Passed: double costs, fresh starts 2003/2007/2010, 15 of 17 ten-year windows, both halves, and a 2000–12 walk-forward pick. On-time job triggers via cron-job.org |
 | 1.4.0 | Oct 2026 | Runs in the cloud. New `preview` command: ~45 min before the close it runs today's close through the exact rules on a copy of the account using live prices and lists the market-on-close orders (net per ticker, whole shares); never changes the ledger. Checked against real closes: identical orders on a new account, a normal day, a Fed-day swap in/out and a 1:00 PM early close. GitHub Actions workflows replace Task Scheduler / `run_daily.bat` (preview, daily run, start account, validate; DST and early closes handled via the NYSE calendar). Dashboard: **Place before the close** card. Price download retries when Yahoo throttles |
 | 1.3.0 | Oct 2026 | Two rules added after testing ~100 ideas: (1) **Fed-day swap**: the LDS sleeve holds TQQQ from the close before each scheduled FOMC decision to the close of decision day; (2) **50/50 reset once a year** (December) instead of quarterly. Engine replay at 0.05% slippage: 2000–26 31.3% → 32.7% CAGR, max DD −50.9% → −43.4%; 2007–26 35.7% → 39.2%, −45.2% → −38.1%. ~12 more trade days a year. Also fixed: future calendar now covers ~14 months without losing market holidays |
 | 1.2.0 | Oct 2026 | Full code review, 7 fixes: (1) volatility uses the same estimator as the validated backtest (sample std); replay 2007–26 now 36.1% CAGR, −44.8% max DD, matching the backtest (36.1% / −44.7%) instead of slightly beating it; (2) ETF splits: Yahoo's split-adjusted prices are converted back to real per-share prices, and the split day no longer shows a fake ±50% return (which could falsely trigger the 30-down rule); (3) a missing price now stops the run with a clear error instead of valuing that ETF at $0; short gaps (≤5 days) carry the last price; (4) a monthly contribution is invested once on its day instead of re-trading 9Sig every day until quarter end; (5) leftover positions under $25 are fully closed when an ETF leaves the target; (6) `--whole-shares` is remembered by the account; the SPY benchmark now includes dividends; (7) warning when the market-holiday calendar library is missing. 30 regression tests pass (splits, gaps, dividends, contributions, whole shares, catch-up runs, holidays) |

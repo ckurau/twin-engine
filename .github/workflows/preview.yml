@@ -1,8 +1,8 @@
 name: Preview orders (before the close)
 # Runs ~45 min before the close and lists the market-on-close orders to place today.
-# GitHub cron is UTC and can start 10-30 min late, so there is one entry per DST offset
-# (and two more for 1:00 PM early closes). The engine itself checks the NYSE calendar
-# and only runs 5-65 min before today's close, so the extra entries do nothing.
+# Started on time by cron-job.org (workflow_dispatch with window=true, New York time).
+# The UTC schedule below is a backup: GitHub cron can start hours late. The engine checks
+# the NYSE calendar, only runs 5-65 min before today's close, and skips a second preview.
 on:
   schedule:
     - cron: "15 19 * * 1-5"   # 3:15 PM EDT
@@ -10,6 +10,10 @@ on:
     - cron: "15 16 * * 1-5"   # 12:15 PM EDT (early-close days)
     - cron: "15 17 * * 1-5"   # 12:15 PM EST (early-close days)
   workflow_dispatch:            # "Run workflow" button: runs right away, any time
+    inputs:
+      window:
+        description: "Only run 5-65 min before the close (set by cron-job.org)"
+        default: "false"
 permissions:
   contents: write
   issues: write
@@ -28,7 +32,7 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Preview today's orders
         id: pv
-        run: python twin_engine.py preview ${{ github.event_name == 'schedule' && '--window' || '' }}
+        run: python twin_engine.py preview ${{ (github.event_name == 'schedule' || inputs.window == 'true') && '--window' || '' }}
       - name: Show on the run page
         if: steps.pv.outputs.ran == '1'
         run: cat preview.md >> "$GITHUB_STEP_SUMMARY"

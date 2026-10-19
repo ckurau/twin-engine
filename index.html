@@ -299,7 +299,7 @@ function previewCard(){
 }
 
 /* ---------------- before the first run ---------------- */
-const DEFAULT_PARAMS = {fomc_swap: true, split_9sig: .5, sig_rate: .09, vol_target: .8, vol_power: 10, vol_band: .05, vol_lookback: 20, tom_after: 3, sma_days: 210, lds_core: .85, lds_overlay: .15, lds_threshold: .05, slippage_bps: 2};
+const DEFAULT_PARAMS = {fomc_swap: true, fomc_asset: "SOXL", lds_review: "month", dip_rsi2: 20, split_9sig: .5, sig_rate: .09, vol_target: .8, vol_power: 10, vol_band: .05, vol_lookback: 20, tom_after: 3, sma_days: 210, lds_core: .85, lds_overlay: .15, lds_threshold: .05, slippage_bps: 2};
 function nextCloseLabel(){
   const now = new Date(), et = new Date(now.toLocaleString("en-US", {timeZone: "America/New_York"}));
   const d = new Date(et); const afterClose = et.getHours() > 16 || (et.getHours() === 16 && et.getMinutes() >= 15);
@@ -380,7 +380,8 @@ function renderOverview(){
 
   <div class="grid2">
     ${engineCard("e1", "Engine 1", "Modified 9Sig + TOM", n.value, n.weight, [
-      ["TQQQ share of growth", `${n.tqqq_weight.toFixed(0)}%${n.tom_active ? " (TOM boost)" : ""}`],
+      ["TQQQ share of growth", `${n.tqqq_weight.toFixed(0)}%${n.dip_active ? " (dip boost)" : n.tom_active ? " (TOM boost)" : ""}`],
+      ["QQQ 2-day RSI", n.rsi2 != null ? `${n.rsi2.toFixed(0)}${n.qqq_uptrend ? "" : " · below 200d"}` : "—"],
       ["TQQQ 20-day volatility", n.vol20 != null ? n.vol20.toFixed(0) + "%" : "—"],
       ["Growth / defensive", `${money(n.growth, 0)} / ${money(n.defensive, 0)}`],
       ["Quarter target (" + dfmt(n.quarter_end) + ")", money(n.quarter_target, 0)],
@@ -389,7 +390,7 @@ function renderOverview(){
       ["Gross leverage", l.gross.toFixed(2) + "x"],
       ["Assets in uptrend", l.assets.filter(a => a.trend === "UP").map(a => a.sym).join(", ") || "none"],
       ["Last rebalance", dlong(l.last_rebalance)],
-      ["Next weekly review", dlong(l.next_review)],
+      ["Next monthly review", dlong(l.next_review)],
       [l.fomc_active ? "Fed-day swap (active)" : "Next Fed-day swap", l.fomc_active ? "sell at close " + dlong(l.fomc_decision) : (l.fomc_entry ? "buy at close " + dlong(l.fomc_entry) : "—")],
     ], Math.min(100, l.gross / 3 * 100), "Leverage used")}
   </div>
@@ -574,7 +575,7 @@ function renderSignals(){
   <div class="card"><div class="h2"><span class="pill e1"><span class="dot"></span>Engine 1</span>Volatility switch</div>
     <div class="gauge">${gauge}<div class="txt">
       <div class="muted" style="font-size:12px">TQQQ 20-day volatility</div><div class="bigpct num">${vol.toFixed(0)}%</div>
-      <div class="rows"><div class="row"><span>Switch size (base)</span><span>${base.toFixed(0)}%</span></div><div class="row"><span>Held now</span><span>${n.tqqq_weight.toFixed(0)}%${n.tom_active ? " · TOM" : ""}</span></div>
+      <div class="rows"><div class="row"><span>Switch size (base)</span><span>${base.toFixed(0)}%</span></div><div class="row"><span>Held now</span><span>${n.tqqq_weight.toFixed(0)}%${n.dip_active ? " · dip boost" : n.tom_active ? " · TOM" : ""}</span></div>
       <div class="row"><span>Full size while vol ≤</span><span>${vT}%</span></div><div class="row"><span>About half at</span><span>${vH}%</span></div><div class="row"><span>Near zero above</span><span>${vZ}%</span></div></div>
     </div></div></div>
 
@@ -582,6 +583,8 @@ function renderSignals(){
     <div class="card"><div class="h2"><span class="pill e1"><span class="dot"></span>Engine 1</span>Turn-of-month window</div>
       <div class="fg2" style="font-size:13.5px">${n.tom_active ? `<b style="color:var(--fg)">Active now.</b> TQQQ held at full size until the close on ${dlong(n.tom_end)}.` : `Next window: buy at the close on <b style="color:var(--fg)">${dlong(n.tom_start)}</b>, back to normal size at the close on <b style="color:var(--fg)">${dlong(n.tom_end)}</b>.`} ${base >= 99.9 ? "The switch is already at 100%, so this window will not trade." : ""}</div>
       ${calHtml}
+      <div class="row" style="margin-top:12px"><span>Dip boost</span><span>${n.dip_active ? '<span class="pill up">On for next session</span>' : "off"}</span></div>
+      <div class="muted" style="font-size:12.5px;margin-top:4px">When QQQ's 2-day RSI closes below ${n.dip_threshold ?? 20} while QQQ is above its 200-day average, TQQQ goes to full size for the next session. Now: RSI ${n.rsi2 != null ? n.rsi2.toFixed(0) : "—"}, QQQ ${n.qqq_uptrend ? "above" : "below"} its 200-day average.</div>
     </div>
     <div class="card"><div class="h2"><span class="pill e1"><span class="dot"></span>Engine 1</span>9Sig quarterly signal</div>
       <div class="row"><span>Growth sub-sleeve now</span><span>${money(n.growth, 0)}</span></div>
@@ -596,11 +599,11 @@ function renderSignals(){
 
   <div class="card"><div class="h2"><span class="pill e2"><span class="dot"></span>Engine 2</span>Fed-day swap <span class="r">${l.fomc_active ? '<span class="pill up">Active</span>' : '<span class="pill">Waiting</span>'}</span></div>
     ${l.fomc_active
-      ? `<div class="fg2" style="font-size:13.5px"><b style="color:var(--fg)">The whole LDS sleeve is in TQQQ</b> for the Fed decision on ${dlong(l.fomc_decision)}. At that day's close: sell the TQQQ and buy back the LDS positions.</div>`
+      ? `<div class="fg2" style="font-size:13.5px"><b style="color:var(--fg)">The whole LDS sleeve is in ${l.fomc_asset || "SOXL"}</b> for the Fed decision on ${dlong(l.fomc_decision)}. At that day's close: sell the ${l.fomc_asset || "SOXL"} and buy back the LDS positions.</div>`
       : `<div class="row"><span>Next Fed decision</span><span>${l.fomc_decision ? dlong(l.fomc_decision) + " · in " + daysTo(l.fomc_decision) + "d" : "—"}</span></div>
-         <div class="row"><span>Swap into TQQQ at the close</span><span>${l.fomc_entry ? dlong(l.fomc_entry) : "—"}</span></div>
+         <div class="row"><span>Swap into ${l.fomc_asset || "SOXL"} at the close</span><span>${l.fomc_entry ? dlong(l.fomc_entry) : "—"}</span></div>
          <div class="row"><span>Swap back at the close</span><span>${l.fomc_decision ? dlong(l.fomc_decision) : "—"}</span></div>`}
-    <div class="muted" style="font-size:12.5px;margin-top:8px">Stocks have tended to rise on scheduled Fed decision days. Eight times a year the LDS sleeve holds TQQQ for that one day. Engine 1 is not affected.</div>
+    <div class="muted" style="font-size:12.5px;margin-top:8px">Stocks have tended to rise on scheduled Fed decision days. Eight times a year the LDS sleeve holds ${l.fomc_asset || "SOXL"} (3x semiconductors) for that one day. Engine 1 is not affected.</div>
   </div>
 
   <div class="card"><div class="h2"><span class="pill e2"><span class="dot"></span>Engine 2</span>LDS trend board <span class="r muted">next review ${dlong(l.next_review)}</span></div>
@@ -623,14 +626,15 @@ function renderStrategy(){
       <li><b>30-down rule:</b> after a quarter where the growth bucket fell 30% or more, ignore the next 4 sell signals.</li>
       <li><b>Volatility switch (daily):</b> TQQQ share of the growth bucket = min(1, (${Math.round(P.vol_target * 100)}% ÷ TQQQ 20-day volatility)<sup>${P.vol_power}</sup>). It only changes when the new value differs by more than 5 points. The rest sits in TLT/GLD.</li>
       <li><b>Turn-of-month:</b> hold full TQQQ from the last trading day of the month through the 3rd trading day of the next. Only trades when the switch is below 100%.</li>
+      <li><b>Dip boost:</b> when QQQ's 2-day RSI closes below 20 while QQQ is above its 200-day average, hold full TQQQ for the next session. Only trades when the switch is below 100%.</li>
     </ul>
     <h3><span style="color:var(--e2)">Engine 2</span> · Leveraged Diversification (LDS)</h3>
     <ul>
-      <li><b>Checked at the close of the last trading day of each week</b> using SPY, QQQ, TLT and GLD.</li>
+      <li><b>Checked at the close of the last trading day of each month</b> using SPY, QQQ, TLT and GLD.</li>
       <li><b>Core (85%):</b> assets closing above their 210-day average, weighted by 1 ÷ 63-day volatility, scaled up to the most leverage the ETFs allow (3x for stocks and Treasuries, 2x for gold): UPRO, TQQQ, TMF, UGL.</li>
       <li><b>Overlay (15%):</b> long if the average of 1, 3, 6 and 12-month returns is positive, short (inverse ETF) if negative; sized to 15% volatility. Inverse ETFs: SPXU, SQQQ, TMV, GLL.</li>
       <li><b>Trade only if</b> the total change is more than 5% of the sleeve.</li>
-      <li><b>Fed-day swap:</b> at the close of the trading day before each scheduled Fed (FOMC) decision, sell the whole LDS sleeve and buy TQQQ. At the close of decision day, sell the TQQQ and buy back the normal LDS positions. 8 times a year.</li>
+      <li><b>Fed-day swap:</b> at the close of the trading day before each scheduled Fed (FOMC) decision, sell the whole LDS sleeve and buy SOXL (3x semiconductors). At the close of decision day, sell the SOXL and buy back the normal LDS positions. 8 times a year.</li>
     </ul>
     <h3>What it never does</h3>
     <p>No stop-losses, no profit targets, no discretionary overrides. Every exit is one of the rules above.</p>
@@ -638,11 +642,12 @@ function renderStrategy(){
   <div class="grid2">
     <div class="card"><div class="h2">Backtest reference ($20k)</div><div class="tblwrap"><table>
       <thead><tr><th>Period</th><th>CAGR</th><th>Max DD</th><th>Final</th></tr></thead><tbody>
-      <tr><td>Twin Engine 2000–26</td><td>32.7%</td><td class="dn">−43%</td><td>$38.2M</td></tr>
-      <tr><td>2007–26 (fresh start)</td><td>39.2%</td><td class="dn">−38%</td><td>$13.5M</td></tr>
+      <tr><td>Twin Engine 2000–26</td><td>35.2%</td><td class="dn">−40%</td><td>$64.8M</td></tr>
+      <tr><td>2007–26 (fresh start)</td><td>40.6%</td><td class="dn">−40%</td><td>$16.9M</td></tr>
+      <tr><td>2010–26 (real ETFs only)</td><td>36.0%</td><td class="dn">−40%</td><td>$3.3M</td></tr>
             <tr><td>SPY 2000–26</td><td>8.2%</td><td class="dn">−55%</td><td>$165k</td></tr>
       </tbody></table></div>
-      <div class="muted" style="font-size:12.5px;margin-top:8px">Realistic live expectation ≈ 20–25%/yr with a 45–60% drawdown at some point. Engine replay of v1.3 at 0.05% slippage per fill. Beat SPY in 20 of 27 years; worst year −36% (2022).</div></div>
+      <div class="muted" style="font-size:12.5px;margin-top:8px">Realistic live expectation ≈ 20–25%/yr with a 45–60% drawdown at some point. Engine replay of v1.5 at 0.05% per fill. Before 2010 the leveraged ETFs are rebuilt from their indexes; from 2010 v1.5 beat v1.3 by about 2 points a year. Worst year −33% (2022).</div></div>
     <div class="card"><div class="h2">Parameters</div><div class="tblwrap"><table><tbody>
       <tr><td>Split 9Sig / LDS</td><td>${Math.round(P.split_9sig * 100)} / ${Math.round((1 - P.split_9sig) * 100)}</td></tr>
       <tr><td>9Sig quarterly growth</td><td>${(P.sig_rate * 100).toFixed(0)}%</td></tr>
@@ -653,7 +658,9 @@ function renderStrategy(){
       <tr><td>LDS core / overlay</td><td>${P.lds_core * 100}% / ${P.lds_overlay * 100}%</td></tr>
       <tr><td>LDS trade threshold</td><td>${P.lds_threshold * 100}%</td></tr>
       <tr><td>50/50 reset</td><td>year end</td></tr>
-      <tr><td>Fed-day swap</td><td>${P.fomc_swap === false ? "off" : "on"}</td></tr>
+      <tr><td>Fed-day swap</td><td>${P.fomc_swap === false ? "off" : "on, into " + (P.fomc_asset || "SOXL")}</td></tr>
+      <tr><td>LDS review</td><td>${P.lds_review === "week" ? "weekly" : "monthly"}</td></tr>
+      <tr><td>Dip boost (QQQ 2-day RSI)</td><td>${P.dip_rsi2 == null ? "off" : "below " + P.dip_rsi2}</td></tr>
       <tr><td>Slippage per fill</td><td>${P.slippage_bps} bp</td></tr>
       <tr><td>Monthly contribution</td><td>${money(D.meta.contrib_monthly, 0)}</td></tr>
       </tbody></table></div></div>
