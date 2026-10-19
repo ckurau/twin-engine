@@ -68,7 +68,7 @@ def _one(args):
     name, ov, kw = args
     import bt
     s = bt.run(ov, **kw)
-    return name, {k: v for k, v in s.items() if k not in ("equity", "expo")}, s["equity"]
+    return name, {k: v for k, v in s.items() if k not in ("equity", "expo", "trades")}, s["equity"]
 
 def windows(eq):
     out = {}

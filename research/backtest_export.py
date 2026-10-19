@@ -51,13 +51,18 @@ if __name__ == "__main__":
         proj[key] = dict(rows=rows, p50=float((worst < -0.5).mean()), worst=float(np.median(worst)))
     projection = [dict(year=i + 1, ending=f"Oct {2027 + i}", put_in=20000 + 2400 * (i + 1), median=round(a), p10=round(b), p90=round(c), conservative=round(proj["conservative"]["rows"][i][0]))
                   for i, (a, b, c) in enumerate(proj["realistic"]["rows"])]
+    from metrics import compute
+    rfd = pd.read_pickle(os.path.join(HERE, "data", "rf.pkl")); drag = (R["2000-2026"]["cagr"] - R["2000-2026, double trading costs"]["cagr"])
+    e10 = R["2010-2026 (real ETFs only)"]["equity"]
+    trading = {"2000-2026": compute(eq, spy, rfd, R["2000-2026"]["trades"], drag),
+               "2010-2026 (real ETFs)": compute(e10, spy.reindex(e10.index) if False else pd.read_pickle(os.path.join(HERE, "data", "panel.pkl"))["SPY"], rfd, R["2010-2026 (real ETFs only)"]["trades"], drag)}
     eqm = eq.resample("ME").last(); spm = spy.resample("ME").last()
     out = dict(
         meta=dict(version=te.VERSION, generated=str(dt.date.today()), start_capital=20000,
                   notes=["Production engine replayed close by close, $20,000 start, no deposits, 0.05% cost per fill.",
                          "Before 2010 the leveraged ETFs are rebuilt from their indexes (calibrated to the real funds); from March 2010 every ETF is the real fund.",
                          "Backtests are not forecasts. The projection assumes returns 8 points a year below the backtest (realistic) or 15 points (conservative)."]),
-        scenarios=scen, years=years, crashes=crashes, drawdowns=eps,
+        scenarios=scen, years=years, trading=trading, crashes=crashes, drawdowns=eps,
         metrics=dict(ulcer=round(ulcer * 100, 1), martin=round(cagr(eq) / ulcer, 2), worst10=round(min(w10.values()) * 100, 1), best10=round(max(w10.values()) * 100, 1),
                      median10=round(float(np.median(list(w10.values()))) * 100, 1), avg_nasdaq=round(float(xp["QQQ"].mean()), 2)),
         stress=dict(median=round(float(loss.median()) * 100), p10=round(float(loss.quantile(0.10)) * 100), worst=round(float(loss.min()) * 100),
