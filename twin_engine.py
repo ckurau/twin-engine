@@ -30,7 +30,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 STATE_PATH = os.path.join(HERE, "state.json")
 SUMMARY_PATH = os.path.join(HERE, "summary.json")
 PREVIEW_PATH = os.path.join(HERE, "preview.json")
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 
 # ----------------------------------------------------------------------------- parameters (backtested values)
 P = dict(
@@ -53,7 +53,7 @@ P = dict(
     tom_after=3,                # turn-of-month: full TQQQ on last trading day + first 3 trading days
     defensive=("TLT", "GLD"),   # defensive half of 9Sig, 50/50
     # --- LDS sleeve (leveraged diversification)
-    lds_assets=("SPY", "QQQ", "TLT", "GLD"),
+    lds_assets=("SPY", "TLT", "GLD"),   # v1.6: QQQ dropped - 9Sig already holds the Nasdaq (v1.5: SPY, QQQ, TLT, GLD)
     lds_core=0.85, lds_overlay=0.15,
     lds_vol_target=1.00,        # core risk parity scaled to 100% vol target -> capped by available leverage
     lds_overlay_vol=0.15,
@@ -425,17 +425,18 @@ def step(st, date, adj: pd.DataFrame, close: dict, cal: Calendar, divs: dict | N
         lds["fomc_swap"] = dict(active=False, last=swap.get("decision")); swapped_back = True
         ev.append("Fed-day swap ended: LDS sleeve back to its trend/risk positions")
     # --- LDS review (last session of the month; v1.3: of the week) or first day
-    if (cal.is_lds_review(date) or lds_force) and not swapped_back:
+    rule_change = bool(st["last_date"]) and lds.get("assets", ["SPY", "QQQ", "TLT", "GLD"]) != list(P["lds_assets"])   # asset list changed (v1.6): rebalance once
+    if (cal.is_lds_review(date) or lds_force or rule_change) and not swapped_back:
         caps = implement(ex); vl = sleeve_value(st, "LDS", close)
         tg = {t: c * vl for t, c in caps.items()}
         cur = {t: sh * close[t] for t, sh in st["sleeves"]["LDS"]["holdings"].items()}
         turn = sum(abs(tg.get(t, 0) - cur.get(t, 0)) for t in set(tg) | set(cur))
-        if turn > P["lds_threshold"] * vl or lds_force:
-            set_targets(st, "LDS", tg, close, date, "Initial allocation" if lds_force else "LDS monthly rebalance")
+        if turn > P["lds_threshold"] * vl or lds_force or rule_change:
+            set_targets(st, "LDS", tg, close, date, "Initial allocation" if lds_force else ("LDS rebalance: v1.6 rule change (no QQQ)" if rule_change else "LDS monthly rebalance"))
             lds["exposures"] = ex; lds["last_rebalance"] = str(date.date()); ev.append(f"LDS rebalanced (turnover {turn / vl:.0%})")
         else:
             ev.append(f"LDS monthly check: turnover {turn / vl:.1%} < 5%, no trade")
-        lds["last_check"] = str(date.date()); lds["target_exposures"] = ex
+        lds["last_check"] = str(date.date()); lds["target_exposures"] = ex; lds["assets"] = list(P["lds_assets"])
     # --- LDS: FOMC swap in (close before a scheduled Fed decision): whole LDS sleeve into the swap ETF for one day
     if P["fomc_swap"] and cal.is_pre_fomc(date) and not (lds.get("fomc_swap") or {}).get("active"):
         vl = sleeve_value(st, "LDS", close); dec = cal.next_day(date)

@@ -299,7 +299,7 @@ function previewCard(){
 }
 
 /* ---------------- before the first run ---------------- */
-const DEFAULT_PARAMS = {fomc_swap: true, fomc_asset: "SOXL", lds_review: "month", dip_rsi2: 20, split_9sig: .5, sig_rate: .09, vol_target: .8, vol_power: 10, vol_band: .05, vol_lookback: 20, tom_after: 3, sma_days: 210, lds_core: .85, lds_overlay: .15, lds_threshold: .05, slippage_bps: 2};
+const DEFAULT_PARAMS = {lds_assets: ["SPY", "TLT", "GLD"], fomc_swap: true, fomc_asset: "SOXL", lds_review: "month", dip_rsi2: 20, split_9sig: .5, sig_rate: .09, vol_target: .8, vol_power: 10, vol_band: .05, vol_lookback: 20, tom_after: 3, sma_days: 210, lds_core: .85, lds_overlay: .15, lds_threshold: .05, slippage_bps: 2};
 function nextCloseLabel(){
   const now = new Date(), et = new Date(now.toLocaleString("en-US", {timeZone: "America/New_York"}));
   const d = new Date(et); const afterClose = et.getHours() > 16 || (et.getHours() === 16 && et.getMinutes() >= 15);
@@ -639,9 +639,9 @@ function renderStrategy(){
     </ul>
     <h3><span style="color:var(--e2)">Engine 2</span> · Leveraged Diversification (LDS)</h3>
     <ul>
-      <li><b>Checked at the close of the last trading day of each month</b> using SPY, QQQ, TLT and GLD.</li>
-      <li><b>Core (85%):</b> assets closing above their 210-day average, weighted by 1 ÷ 63-day volatility, scaled up to the most leverage the ETFs allow (3x for stocks and Treasuries, 2x for gold): UPRO, TQQQ, TMF, UGL.</li>
-      <li><b>Overlay (15%):</b> long if the average of 1, 3, 6 and 12-month returns is positive, short (inverse ETF) if negative; sized to 15% volatility. Inverse ETFs: SPXU, SQQQ, TMV, GLL.</li>
+      <li><b>Checked at the close of the last trading day of each month</b> using SPY, TLT and GLD (v1.6: no QQQ, because Engine 1 already holds the Nasdaq).</li>
+      <li><b>Core (85%):</b> assets closing above their 210-day average, weighted by 1 ÷ 63-day volatility, scaled up to the most leverage the ETFs allow (3x for stocks and Treasuries, 2x for gold): UPRO, TMF, UGL.</li>
+      <li><b>Overlay (15%):</b> long if the average of 1, 3, 6 and 12-month returns is positive, short (inverse ETF) if negative; sized to 15% volatility. Inverse ETFs: SPXU, TMV, GLL.</li>
       <li><b>Trade only if</b> the total change is more than 5% of the sleeve.</li>
       <li><b>Fed-day swap:</b> at the close of the trading day before each scheduled Fed (FOMC) decision, sell the whole LDS sleeve and buy SOXL (3x semiconductors). At the close of decision day, sell the SOXL and buy back the normal LDS positions. 8 times a year.</li>
     </ul>
@@ -651,12 +651,12 @@ function renderStrategy(){
   <div class="grid2">
     <div class="card"><div class="h2">Backtest reference ($20k)</div><div class="tblwrap"><table>
       <thead><tr><th>Period</th><th>CAGR</th><th>Max DD</th><th>Final</th></tr></thead><tbody>
-      <tr><td>Twin Engine 2000–26</td><td>35.2%</td><td class="dn">−40%</td><td>$64.8M</td></tr>
-      <tr><td>2007–26 (fresh start)</td><td>40.6%</td><td class="dn">−40%</td><td>$16.9M</td></tr>
-      <tr><td>2010–26 (real ETFs only)</td><td>36.0%</td><td class="dn">−40%</td><td>$3.3M</td></tr>
+      <tr><td>Twin Engine 2000–26</td><td>36.2%</td><td class="dn">−37%</td><td>$78.0M</td></tr>
+      <tr><td>2007–26 (fresh start)</td><td>41.1%</td><td class="dn">−35%</td><td>$18.2M</td></tr>
+      <tr><td>2010–26 (real ETFs only)</td><td>36.1%</td><td class="dn">−35%</td><td>$3.3M</td></tr>
             <tr><td>SPY 2000–26</td><td>8.2%</td><td class="dn">−55%</td><td>$165k</td></tr>
       </tbody></table></div>
-      <div class="muted" style="font-size:12.5px;margin-top:8px">Realistic live expectation ≈ 20–25%/yr with a 45–60% drawdown at some point. Engine replay of v1.5 at 0.05% per fill. Before 2010 the leveraged ETFs are rebuilt from their indexes; from 2010 v1.5 beat v1.3 by about 2 points a year. Worst year −33% (2022).</div></div>
+      <div class="muted" style="font-size:12.5px;margin-top:8px">Realistic live expectation ≈ 20–25%/yr with a 45–60% drawdown at some point. Engine replay of v1.6 at 0.05% per fill. Before 2010 the leveraged ETFs are rebuilt from their indexes; from 2010 v1.5 beat v1.3 by about 2 points a year. Worst year −33% (2022).</div></div>
     <div class="card"><div class="h2">Parameters</div><div class="tblwrap"><table><tbody>
       <tr><td>Split 9Sig / LDS</td><td>${Math.round(P.split_9sig * 100)} / ${Math.round((1 - P.split_9sig) * 100)}</td></tr>
       <tr><td>9Sig quarterly growth</td><td>${(P.sig_rate * 100).toFixed(0)}%</td></tr>
