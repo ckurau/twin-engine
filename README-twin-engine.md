@@ -12,53 +12,73 @@
 
 Two independent "engines" share one account and are reset to 50/50 at each year end.
 **Engine 1 – Modified 9Sig** holds TQQQ in a *growth* sub-sleeve and TLT + GLD in a *defensive* reserve. Every quarter the growth sub-sleeve must grow 9%: excess is sold into the reserve, shortfalls are bought from it. Inside the growth sub-sleeve a **volatility switch** shrinks TQQQ when Nasdaq volatility spikes, a **turn-of-month (TOM)** rule holds full TQQQ around month-end, and a **dip boost** holds full TQQQ for a session after a sharp short-term drop in an uptrend.
-**Engine 2 – LDS** checks the S&P 500, long Treasuries and gold at each month-end close (v1.6: no Nasdaq-100, which Engine 1 already holds); it holds the ones above their 210-day average, sized by inverse volatility and levered up with 3x/2x ETFs (UPRO, TQQQ, TMF, UGL), plus a small long/short momentum overlay (can use SPXU, SQQQ, TMV, GLL). On each scheduled **Fed decision day** (8 a year) the whole LDS sleeve is held in SOXL (3x semiconductors) for that one day.
+**Engine 2 – LDS** checks the S&P 500, long Treasuries and gold at each month-end close (v1.6: no Nasdaq-100, which Engine 1 already holds); it holds the ones above their 210-day average, sized by inverse volatility and levered up with 3x/2x ETFs (UPRO, TMF, UGL), plus a small long/short momentum overlay (can use SPXU, TMV, GLL). On each scheduled **Fed decision day** (8 a year) the whole LDS sleeve is held in SOXL (3x semiconductors) for that one day.
 
-### Expected behaviour (backtest, $20k start)
+### Expected behaviour (backtest of v1.6.0, $20k start, no deposits)
 
-| | Final equity | CAGR | Max drawdown |
+The same numbers, plus a growth chart and calendar years, are on the dashboard's **Backtest** tab (from `backtest.json`; regenerate with `research\backtest_export.py` after any rule change).
+
+| Scenario | $20k became | CAGR | Max drawdown |
 |---|---|---|---|
-| **v1.5**, 2000 → Oct 2026 | $64.8M | 35.2% | −40% |
-| **v1.5**, 2007 → Oct 2026 | $16.9M | 40.6% | −40% |
-| **v1.5**, 2010 → Oct 2026 (real ETF prices only) | $3.3M | 36.0% | −40% |
-| v1.3 (same data), 2000 → Oct 2026 | $25.3M | 30.6% | −52% |
-| v1.3 (same data), 2010 → Oct 2026 | — | 34.0% | −39% |
-| SPY, 2000 → Sep 2026 | $165k | 8.2% | −55% |
+| 2000-2026 | $78.0M | 36.2% | −37.4% |
+| 2007-2026 (fresh start) | $18.2M | 41.1% | −35.2% |
+| 2010-2026 (real ETFs only) | $3.3M | 36.1% | −35.2% |
+| 2000-2026, double trading costs | $56.8M | 34.6% | −38.6% |
+| SPY, 2000-2026 | $169k | 8.3% | −55.2% |
 
-Rows marked "same data" come from the Idea Lab III harness (`research/`), which replays the production engine over a rebuilt 1998–2026 price history. Before 2010 the leveraged ETFs are reconstructed from their indexes, and most of v1.5's 2000–2026 lead comes from 2000 itself; the fair estimate of the improvement is the real-ETF era: **about +2 points a year**, with a drawdown about 1 point deeper.
+Before 2010 the leveraged ETFs are rebuilt from their indexes (calibrated to the real funds); from March 2010 every ETF is the real fund, so **2010–2026 is the most honest row**. Ten-year windows (starts 2000–2016): worst 27.8%, median 37.2%, best 45.9% CAGR. Ulcer index 12.1, Martin ratio 2.98.
 
-**Realistic live expectation:** ~20–25%/yr with a 45–60% drawdown at some point.
+**Through the crashes** (worst drop inside the period / start to end, vs SPY start to end):
 
-### 20-year projection (v1.3, $20,000 start on Oct 16, 2026; not re-run for v1.5 — treat as a conservative reference)
+| Period | Worst drop | Start → end | SPY |
+|---|---|---|---|
+| Dot-com crash | −37.4% | −4.8% | −47.5% |
+| 2008 financial crisis | −26.8% | +58.4% | −55.2% |
+| Q4 2018 | −32.7% | −32.6% | −19.3% |
+| Covid crash | −24.3% | −12.5% | −33.7% |
+| 2022 bear market | −34.6% | −30.4% | −18.1% |
 
-Monte Carlo: 20,000 paths that resample real 12-month blocks of the v1.3 engine's monthly returns (2000–2026, 0.05% slippage). **Realistic** = backtest returns minus 8 points a year (future edge decay, real-world fills). **Conservative** = minus 15 points. Values are account balances at each anniversary.
+How a leveraged strategy fell less than SPY in 2000–02 and 2008: the volatility switch shrinks TQQQ as markets get choppy, and LDS only holds assets above their 210-day average, so in long bear markets the account drifts into Treasuries and gold. **2022 and Q4 2018 were worse than SPY**: stocks and bonds fell together, so there was nowhere to hide. A one-day crash like Oct 19, 1987 (S&P -20.5%, Nasdaq -20%, semiconductors -25%, Treasuries +2% in one day (like Oct 19, 1987)) applied to every day's holdings: typical loss -35%, 1 day in 10 -51%, worst -71%.
 
-| Year | Ending | Realistic median | Profit (median) | 10th – 90th percentile | Median with +$200/mo | Conservative median |
-|---|---|---|---|---|---|---|
-| 1 | Oct 2027 | $24,363 | $4,363 | $16,962 – $35,030 | $27,036 | $22,509 |
-| 2 | Oct 2028 | $29,758 | $9,758 | $17,694 – $50,668 | $35,789 | $25,402 |
-| 3 | Oct 2029 | $36,514 | $16,514 | $19,305 – $70,242 | $46,698 | $28,797 |
-| 4 | Oct 2030 | $44,876 | $24,876 | $21,512 – $95,290 | $59,974 | $32,700 |
-| 5 | Oct 2031 | $55,190 | $35,190 | $24,181 – $129,076 | $76,856 | $37,155 |
-| 6 | Oct 2032 | $67,200 | $47,200 | $27,135 – $170,244 | $95,984 | $41,798 |
-| 7 | Oct 2033 | $82,152 | $62,152 | $31,428 – $224,987 | $120,759 | $47,210 |
-| 8 | Oct 2034 | $100,184 | $80,184 | $35,604 – $294,563 | $150,265 | $53,192 |
-| 9 | Oct 2035 | $122,995 | $102,995 | $40,667 – $390,629 | $187,478 | $60,335 |
-| 10 | Oct 2036 | $150,874 | $130,874 | $47,203 – $507,450 | $232,560 | $68,379 |
-| 11 | Oct 2037 | $185,328 | $165,328 | $54,253 – $653,815 | $290,961 | $77,604 |
-| 12 | Oct 2038 | $228,268 | $208,268 | $62,282 – $852,076 | $359,434 | $88,312 |
-| 13 | Oct 2039 | $279,363 | $259,363 | $73,116 – $1,083,516 | $443,398 | $99,856 |
-| 14 | Oct 2040 | $344,216 | $324,216 | $84,848 – $1,402,808 | $549,973 | $113,675 |
-| 15 | Oct 2041 | $422,944 | $402,944 | $100,375 – $1,808,453 | $680,819 | $129,047 |
-| 16 | Oct 2042 | $522,119 | $502,119 | $114,709 – $2,345,605 | $845,944 | $147,186 |
-| 17 | Oct 2043 | $642,697 | $622,697 | $136,239 – $3,044,229 | $1,040,472 | $167,392 |
-| 18 | Oct 2044 | $783,299 | $763,299 | $159,481 – $3,871,205 | $1,275,169 | $188,490 |
-| 19 | Oct 2045 | $963,206 | $943,206 | $186,732 – $4,909,391 | $1,572,807 | $214,146 |
-| 20 | Oct 2046 | $1,178,578 | $1,158,578 | $218,996 – $6,291,138 | $1,930,859 | $242,092 |
+**Realistic live expectation:** ~20–30%/yr, and a 40–50% drop at some point is likely. The backtest's −37% is one historical path, not a floor.
 
-In the realistic case, 41% of paths have a drop worse than −50% at some point (median worst drop −48%), and 0.1% end below $20,000. Without any haircut (the backtest as-is), the median 20-year result is $6.2M. This is a range, not a promise.
+### 25-year projection (v1.6.0, $20,000 start + $200/month)
 
-Replays use 0.05% slippage per fill (stricter than the engine's default 0.02%). Typical year with v1.5: ~40 trade days (v1.3: 55–60). Worst calendar year in the v1.5 replay: −33% (2022).
+Monte Carlo: 20,000 paths that resample real 12-month blocks of the v1.6.0 backtest's monthly returns (2000–2026, 0.05% per fill). **Realistic** = backtest returns minus 8 points a year (edge decay, real-world fills). **Conservative** = minus 15 points. Balances at each anniversary, before inflation.
+
+| Year | Ending | Put in | Realistic median | 10th – 90th percentile | Conservative median |
+|---|---|---|---|---|---|
+| 1 | Oct 2027 | $22,400 | $28k | $20k – $39k | $27k |
+| 2 | Oct 2028 | $24,800 | $38k | $25k – $63k | $35k |
+| 3 | Oct 2029 | $27,200 | $52k | $31k – $93k | $45k |
+| 4 | Oct 2030 | $29,600 | $69k | $38k – $135k | $57k |
+| 5 | Oct 2031 | $32,000 | $91k | $47k – $193k | $71k |
+| 6 | Oct 2032 | $34,400 | $120k | $57k – $272k | $89k |
+| 7 | Oct 2033 | $36,800 | $157k | $70k – $378k | $111k |
+| 8 | Oct 2034 | $39,200 | $204k | $87k – $526k | $137k |
+| 9 | Oct 2035 | $41,600 | $262k | $106k – $725k | $168k |
+| 10 | Oct 2036 | $44,000 | $338k | $131k – $977k | $206k |
+| 11 | Oct 2037 | $46,400 | $437k | $160k – $1.3M | $252k |
+| 12 | Oct 2038 | $48,800 | $559k | $195k – $1.8M | $307k |
+| 13 | Oct 2039 | $51,200 | $722k | $238k – $2.4M | $378k |
+| 14 | Oct 2040 | $53,600 | $922k | $292k – $3.3M | $457k |
+| 15 | Oct 2041 | $56,000 | $1.2M | $359k – $4.4M | $559k |
+| 16 | Oct 2042 | $58,400 | $1.5M | $440k – $5.9M | $675k |
+| 17 | Oct 2043 | $60,800 | $2.0M | $542k – $7.9M | $832k |
+| 18 | Oct 2044 | $63,200 | $2.5M | $651k – $10.5M | $1.0M |
+| 19 | Oct 2045 | $65,600 | $3.2M | $799k – $14.2M | $1.2M |
+| 20 | Oct 2046 | $68,000 | $4.1M | $997k – $18.9M | $1.5M |
+| 21 | Oct 2047 | $70,400 | $5.3M | $1.2M – $25.5M | $1.8M |
+| 22 | Oct 2048 | $72,800 | $6.8M | $1.5M – $33.8M | $2.2M |
+| 23 | Oct 2049 | $75,200 | $8.7M | $1.8M – $45.2M | $2.6M |
+| 24 | Oct 2050 | $77,600 | $11.1M | $2.3M – $59.9M | $3.2M |
+| 25 | Oct 2051 | $80,000 | $14.1M | $2.8M – $80.2M | $3.8M |
+
+In the realistic case 12% of paths fall more than 50% at some point (typical worst drop -40%). This is a range, not a promise.
+
+**Split check (Oct 19, 2026):** 60/40 and 70/30 were tested as ways to trade drawdown for return. After 20 years (realistic median, same deposits): 50/50 $4.08M, 60/40 $4.43M (+8%), 70/30 $4.57M (+12%); chance of a drop worse than 50%: 9%, 13%, 26%. **Decision: stay at 50/50.**
+
+Replays use 0.05% slippage per fill (stricter than the engine's default 0.02%). Typical year: ~40 trade days.
 
 ---
 
@@ -95,7 +115,7 @@ All signals use **closing prices**. In paper trading all orders fill at that day
    Why: Nasdaq rose on Fed decision days far more often than on normal days (TQQQ +0.97% average vs +0.12%, 60% up days, 1999–2026; first documented by Lucca & Moench, 2015). With costs it added +1.4 points of CAGR from 2000 and cut the max drawdown by ~7 points. It helped in both halves of history and in every 10-year window's drawdown. Most of the gain came in 2007–12 and 2020–26. If your fills cost more than ~0.10% per side, the CAGR gain disappears but the drawdown benefit remains.
 
 ### 2.4 What does NOT exist (on purpose)
-No stop-losses, no profit targets, no discretionary overrides. Every exit comes from the rules above. About 255 other ideas tested (100 in the v1.3 lab, 155 in Idea Lab III) (crash pauses, VIX sizing, put hedges, trend filters, Turtle/PTJ/Livermore rules, overnight trading, sell-in-May, extra assets, Bitcoin, more leverage, etc.) either failed walk-forward validation or only added return by adding leverage. The futures-based ones (LDS up to 5x, volatility-managed leverage) need $25k+ and a futures-approved IRA, and carry 1987-crash risk. They are parked for now.
+No stop-losses, no profit targets, no discretionary overrides. Every exit comes from the rules above. About 330 other ideas tested (Idea Labs I–III: ~100 for v1.3, 155 for v1.5, ~80 more on Nasdaq concentration, crash signals, insurance and risk budget for v1.6). Crash-warning signals (VIX term structure, VVIX, credit spreads, Keller canary) all cost far more return than they saved; VIX/tail-risk ETFs cost 2.5–9 pts a year; QQQ puts are the cheapest insurance (~0.4 pt a year) but one contract (~$60k of QQQ) is too big for a $20k account — revisit around $100k (crash pauses, VIX sizing, put hedges, trend filters, Turtle/PTJ/Livermore rules, overnight trading, sell-in-May, extra assets, Bitcoin, more leverage, etc.) either failed walk-forward validation or only added return by adding leverage. The futures-based ones (LDS up to 5x, volatility-managed leverage) need $25k+ and a futures-approved IRA, and carry 1987-crash risk. They are parked for now.
 
 ---
 
@@ -108,6 +128,8 @@ twin-engine/
   state.json           engine state — created by "Start account", DO NOT edit by hand
   summary.json         dashboard data — rewritten by every daily run
   preview.json         today's orders, written ~45 min before the close
+  backtest.json        backtest results for the dashboard's Backtest tab (research/backtest_export.py)
+  research/            Idea Lab test harness: synthetic 1998-2026 history, idea switches, all rounds (data not in git)
   .github/workflows/   the four cloud jobs (below)
   requirements.txt
   README-twin-engine.md
@@ -248,9 +270,10 @@ Futures would get 60/40 tax treatment, but at $20k contracts are far too large t
 | **Positions** | Every position: ticker, sleeve, shares, first/last entry date, average entry price, current price, $ / % P&L, weight, **why it's held and exactly what makes it exit / next review date**, tax lots |
 | **Trades** | Full ledger: date, side, shares, price, $ value, reason, realized P&L, holding days, LONG/SHORT term |
 | **Signals** | 9Sig volatility switch gauge, TOM calendar, quarterly target progress, Fed-day swap status (next decision, buy/sell closes), LDS trend status per asset (price vs 210-day average), momentum overlay |
-| **Strategy** | The rules above, parameters, backtest stats |
+| **Strategy** | The rules above and the parameters |
+| **Backtest** | v1.6 backtest from `backtest.json`: scenarios (2000, 2007, 2010 real ETFs, double costs, SPY), growth chart vs SPY, crash periods, five worst drawdowns, calendar years, 1987-style stress test, 25-year projection |
 
-The dashboard reads `summary.json` from the same folder and shows only your paper account, from its start date onward. Before the first run it shows a "Not started" screen with the setup steps. No simulated or historical data is ever shown.
+The dashboard reads `summary.json` from the same folder and shows only your paper account, from its start date onward. Before the first run it shows a "Not started" screen with the setup steps. No simulated or historical data is mixed into the account; backtest results live only on the Backtest tab.
 
 On order days a **Place before the close** card appears at the top of Overview (from `preview.json`) and disappears once the daily run books that close.
 

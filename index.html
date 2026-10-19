@@ -241,6 +241,7 @@ input.search{flex:1;min-width:120px;background:var(--card);border:1px solid var(
   <button role="tab" id="t-trades" aria-selected="false" data-tab="trades"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></svg>Trades</button>
   <button role="tab" id="t-signals" aria-selected="false" data-tab="signals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-6"/></svg>Signals</button>
   <button role="tab" id="t-strategy" aria-selected="false" data-tab="strategy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7M9 8h3"/></svg>Strategy</button>
+  <button role="tab" id="t-backtest" aria-selected="false" data-tab="backtest"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Backtest</button>
 </nav>
 
 <main class="wrap">
@@ -249,6 +250,7 @@ input.search{flex:1;min-width:120px;background:var(--card);border:1px solid var(
   <section class="tab" id="trades" role="tabpanel" aria-labelledby="t-trades" hidden></section>
   <section class="tab" id="signals" role="tabpanel" aria-labelledby="t-signals" hidden></section>
   <section class="tab" id="strategy" role="tabpanel" aria-labelledby="t-strategy" hidden></section>
+  <section class="tab" id="backtest" role="tabpanel" aria-labelledby="t-backtest" hidden></section>
   <div class="foot" id="foot"></div>
 </main>
 
@@ -280,6 +282,7 @@ async function load(){
     if (!r.ok) throw 0;
     D = await r.json(); D.__src = "file";
   } catch (e) { D = null; }
+  loadBacktest();
   if (!D) { renderEmpty(); return; }
   renderAll();
 }
@@ -656,7 +659,7 @@ function renderStrategy(){
       <tr><td>2010–26 (real ETFs only)</td><td>36.1%</td><td class="dn">−35%</td><td>$3.3M</td></tr>
             <tr><td>SPY 2000–26</td><td>8.2%</td><td class="dn">−55%</td><td>$165k</td></tr>
       </tbody></table></div>
-      <div class="muted" style="font-size:12.5px;margin-top:8px">Realistic live expectation ≈ 20–25%/yr with a 45–60% drawdown at some point. Engine replay of v1.6 at 0.05% per fill. Before 2010 the leveraged ETFs are rebuilt from their indexes; from 2010 v1.5 beat v1.3 by about 2 points a year. Worst year −33% (2022).</div></div>
+      <div class="muted" style="font-size:12.5px;margin-top:8px">Realistic live expectation ≈ 20–30%/yr, with a 40–50% drop likely at some point. Full results on the Backtest tab. Engine replay of v1.6 at 0.05% per fill. Before 2010 the leveraged ETFs are rebuilt from their indexes; from 2010 v1.5 beat v1.3 by about 2 points a year. Worst year −33% (2022).</div></div>
     <div class="card"><div class="h2">Parameters</div><div class="tblwrap"><table><tbody>
       <tr><td>Split 9Sig / LDS</td><td>${Math.round(P.split_9sig * 100)} / ${Math.round((1 - P.split_9sig) * 100)}</td></tr>
       <tr><td>9Sig quarterly growth</td><td>${(P.sig_rate * 100).toFixed(0)}%</td></tr>
@@ -684,6 +687,88 @@ function renderStrategy(){
     <p class="muted">Paper trading only. Not financial advice. Leveraged ETFs can lose most of their value quickly.</p></div>`;
 }
 
+/* ---------------- backtest (static results in backtest.json, written by research/backtest_export.py) ---------------- */
+let BT = null;
+async function loadBacktest(){
+  try { const r = await fetch("backtest.json?t=" + Date.now(), {cache: "no-store"}); BT = r.ok ? await r.json() : null; } catch (e) { BT = null; }
+  renderBacktest();
+}
+function renderBacktest(){
+  const el = $("#backtest");
+  if (!BT) { el.innerHTML = '<div class="card empty">Backtest results are not available. They load from backtest.json in the repo.</div>'; return; }
+  const sgn = v => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(1) + "%";
+  const big = v => v >= 1e6 ? "$" + (v / 1e6).toFixed(1) + "M" : v >= 1e4 ? "$" + Math.round(v / 1e3) + "k" : money(v, 0);
+  const s0 = BT.scenarios[0], s10 = BT.scenarios.find(x => x.name.startsWith("2010")) || s0, spy = BT.scenarios.find(x => x.name.startsWith("SPY"));
+  const M = BT.metrics, S = BT.stress, P = BT.projection;
+  el.innerHTML = `
+  <div class="card hero">
+    <div class="lab">Backtest · engine v${esc(BT.meta.version)} · $20,000 start</div>
+    <div class="big num">${s0.cagr.toFixed(1)}%</div>
+    <div class="chips"><span class="pill neutral">CAGR 2000–2026</span><span class="pill dn">Max drawdown ${sgn(s0.maxdd)}</span><span class="pill neutral">SPY ${s0 && spy ? spy.cagr.toFixed(1) + "% / " + sgn(spy.maxdd) : ""}</span></div>
+    <div class="kpis">
+      <div class="kpi"><div class="k">From 2010</div><div class="v num">${s10.cagr.toFixed(1)}%</div><div class="s">real ETFs · DD ${sgn(s10.maxdd)}</div></div>
+      <div class="kpi"><div class="k">Martin ratio</div><div class="v num">${M.martin.toFixed(2)}</div><div class="s">return per unit of pain</div></div>
+      <div class="kpi"><div class="k">Worst 10 years</div><div class="v num">${M.worst10.toFixed(1)}%</div><div class="s">CAGR · median ${M.median10.toFixed(1)}%</div></div>
+      <div class="kpi"><div class="k">1987-style day</div><div class="v num dn">${S.median}%</div><div class="s">typical · 1 in 10: ${S.p10}%</div></div>
+    </div>
+  </div>
+
+  <div class="card"><div class="h2">Growth of $20,000 <span class="r muted">log scale</span></div><div class="chartbox" id="btChart"></div>
+    <div class="legend"><span><i style="background:var(--fg)"></i>Twin Engine v${esc(BT.meta.version)}</span><span><i style="background:var(--spy)"></i>SPY</span></div></div>
+
+  <div class="card"><div class="h2">Scenarios</div><div class="tblwrap"><table>
+    <thead><tr><th>Period</th><th>CAGR</th><th>Max DD</th><th>$20k became</th><th>Trade days/yr</th></tr></thead><tbody>
+    ${BT.scenarios.map(x => `<tr><td style="font-family:var(--f-body)">${esc(x.name)}</td><td>${x.cagr.toFixed(1)}%</td><td class="dn">${sgn(x.maxdd)}</td><td>${big(x.final)}</td><td>${x.trade_days || "—"}</td></tr>`).join("")}
+    </tbody></table></div></div>
+
+  <div class="grid2">
+    <div class="card"><div class="h2">Through the crashes</div><div class="tblwrap"><table>
+      <thead><tr><th>Period</th><th>Worst drop</th><th>Start→end</th><th>SPY</th></tr></thead><tbody>
+      ${BT.crashes.map(c => `<tr><td style="font-family:var(--f-body)">${esc(c.name)}</td><td class="dn">${sgn(c.strat_worst)}</td><td class="${c.strat_total >= 0 ? "up" : "dn"}">${sgn(c.strat_total)}</td><td class="${c.spy_total >= 0 ? "up" : "dn"}">${sgn(c.spy_total)}</td></tr>`).join("")}
+      </tbody></table></div>
+      <div class="muted" style="font-size:12.5px;margin-top:8px">2022 is the weak spot: stocks and bonds fell together, so there was nowhere to hide.</div></div>
+    <div class="card"><div class="h2">Five worst drawdowns</div><div class="tblwrap"><table>
+      <thead><tr><th>Peak</th><th>Bottom</th><th>Drop</th><th>Back to peak</th></tr></thead><tbody>
+      ${BT.drawdowns.map(d => `<tr><td>${dfmt(d.peak, {month: "short", year: "numeric"})}</td><td>${dfmt(d.trough, {month: "short", year: "numeric"})}</td><td class="dn">${sgn(d.depth)}</td><td>${d.recovered ? dfmt(d.recovered, {month: "short", year: "numeric"}) : "not yet"}</td></tr>`).join("")}
+      </tbody></table></div>
+      <div class="muted" style="font-size:12.5px;margin-top:8px">The backtest's worst is ${sgn(s0.maxdd)}. Expect worse live: in the projection below, ${P.p_drop50}% of paths fall more than 50% at some point (typical worst ${P.median_worst}%).</div></div>
+  </div>
+
+  <div class="card"><div class="h2">Calendar years <span class="r muted">beat SPY in ${BT.years.filter(y => y.strat > y.spy).length} of ${BT.years.length}</span></div><div class="tblwrap" style="max-height:420px"><table>
+    <thead><tr><th>Year</th><th>Twin Engine</th><th>SPY</th><th>Difference</th></tr></thead><tbody>
+    ${BT.years.slice().reverse().map(y => `<tr><td>${y.year}${y.year === new Date().getFullYear() ? " (to date)" : ""}</td><td class="${y.strat >= 0 ? "up" : "dn"}">${sgn(y.strat)}</td><td class="muted">${sgn(y.spy)}</td><td class="${y.strat >= y.spy ? "up" : "dn"}">${sgn(y.strat - y.spy)}</td></tr>`).join("")}
+    </tbody></table></div></div>
+
+  <div class="card"><div class="h2">25-year projection <span class="r muted">$20k + $200/month</span></div><div class="tblwrap" style="max-height:420px"><table>
+    <thead><tr><th>Year</th><th>Put in</th><th>Realistic median</th><th>Likely range (10–90%)</th><th>Conservative</th></tr></thead><tbody>
+    ${P.rows.map(r => `<tr><td>${r.year} · ${esc(r.ending)}</td><td class="muted">${big(r.put_in)}</td><td>${big(r.median)}</td><td class="muted">${big(r.p10)} – ${big(r.p90)}</td><td>${big(r.conservative)}</td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="muted" style="font-size:12.5px;margin-top:8px">20,000 simulated paths built from real 12-month stretches of the backtest. Realistic = backtest returns minus 8 points a year; conservative = minus 15. Before inflation. A range, not a promise.</div></div>
+
+  <div class="card prose"><h3>How these numbers were made</h3><ul>${BT.meta.notes.map(n => `<li>${esc(n)}</li>`).join("")}
+    <li>1987-style day: ${esc(S.shock)}, applied to what the account held on every day since 2000. Worst case ${S.worst}%.</li>
+    <li>Generated ${esc(BT.meta.generated)}. Every rule change is re-tested and this tab is refreshed.</li></ul></div>`;
+  drawBt();
+}
+function drawBt(){
+  const el = $("#btChart"); if (!el || !BT) return;
+  const c = BT.curve, n = c.length, W = Math.max(320, el.clientWidth || 700), H = Math.round(Math.min(300, Math.max(200, W * 0.45)));
+  const L = 50, R = 56, T = 10, B = 24;
+  const lo = Math.log10(Math.min(...c.map(p => Math.min(p[1], p[2]))) * 0.9), hi = Math.log10(Math.max(...c.map(p => Math.max(p[1], p[2]))) * 1.1);
+  const x = i => L + i / (n - 1) * (W - L - R), y = v => T + (1 - (Math.log10(v) - lo) / (hi - lo)) * (H - T - B);
+  const path = k => c.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p[k]).toFixed(1)).join(" ");
+  const ticks = [1e4, 2e4, 1e5, 1e6, 1e7, 1e8].filter(v => Math.log10(v) >= lo && Math.log10(v) <= hi);
+  const lab = v => v >= 1e6 ? "$" + v / 1e6 + "M" : "$" + v / 1e3 + "k";
+  const yrs = c.map((p, i) => [p[0], i]).filter(([d]) => d.endsWith("-01") && +d.slice(0, 4) % 5 === 0);
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Growth of $20,000, Twin Engine versus SPY">
+    ${ticks.map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="${css("--line")}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="10.5" font-family="IBM Plex Mono, monospace" fill="${css("--fg3")}">${lab(v)}</text>`).join("")}
+    ${yrs.map(([d, i]) => `<text x="${x(i)}" y="${H - 6}" text-anchor="middle" font-size="10.5" font-family="IBM Plex Mono, monospace" fill="${css("--fg3")}">${d.slice(0, 4)}</text>`).join("")}
+    <path d="${path(2)}" fill="none" stroke="${css("--spy")}" stroke-width="2"/>
+    <path d="${path(1)}" fill="none" stroke="${css("--fg")}" stroke-width="2"/>
+    <text x="${x(n - 1) + 6}" y="${y(c[n - 1][1]) + 4}" font-size="11" font-family="IBM Plex Mono, monospace" fill="${css("--fg")}">${lab(Math.round(c[n - 1][1] / 1e5) * 1e5)}</text>
+    <text x="${x(n - 1) + 6}" y="${y(c[n - 1][2]) + 4}" font-size="11" font-family="IBM Plex Mono, monospace" fill="${css("--fg3")}">${lab(Math.round(c[n - 1][2] / 1e3) * 1e3)}</text></svg>`;
+}
+
 /* ---------------- tabs ---------------- */
 function show(id, push){
   document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === id)));
@@ -691,14 +776,15 @@ function show(id, push){
   try { localStorage.setItem("te-tab", id); } catch (e) {}
   if (push) { try { history.replaceState(null, "", "#" + id); } catch (e) {} }
   if (id === "overview" && D) drawEquity();
+  if (id === "backtest") drawBt();
   window.scrollTo({top: 0});
 }
 document.querySelector("nav.tabs").addEventListener("click", e => { const b = e.target.closest("button"); if (b) show(b.dataset.tab, true); });
-let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (D && !$("#overview").hidden) drawEquity(); }, 150); });
+let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (D && !$("#overview").hidden) drawEquity(); if (!$("#backtest").hidden) drawBt(); }, 150); });
 const mq = window.matchMedia("(prefers-color-scheme: dark)"); mq.addEventListener && mq.addEventListener("change", () => D && drawEquity());
-new MutationObserver(() => D && renderAll()).observe(document.documentElement, {attributes: true, attributeFilter: ["data-theme"]});
+new MutationObserver(() => { if (D) renderAll(); if (BT) drawBt(); }).observe(document.documentElement, {attributes: true, attributeFilter: ["data-theme"]});
 load().then(() => {
-  let t = (location.hash || "").slice(1); if (!["overview", "positions", "trades", "signals", "strategy"].includes(t)) { try { t = localStorage.getItem("te-tab") || "overview"; } catch (e) { t = "overview"; } }
+  let t = (location.hash || "").slice(1); if (!["overview", "positions", "trades", "signals", "strategy", "backtest"].includes(t)) { try { t = localStorage.getItem("te-tab") || "overview"; } catch (e) { t = "overview"; } }
   show(t, false);
 });
 })();
