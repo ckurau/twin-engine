@@ -31,7 +31,9 @@ DEFAULTS = dict(growth=("TQQQ",), derisk_asset=None, def_trend=False, def_sma=20
                 swap_asset=(("TQQQ", 1.0),), rebal_band=None, tilt=0.0,
                 nine_dip_exit=None, swap_fomc_trend=False, swap_frac=1.0, vol_target_winter=None, vol_ewm_hl=None, vol_vix=False,
                 core_ew=False, tom_trend=False,
-                growth_rot=None, nine_cap=None, lds_riskoff=False, ndx_cap=None, dip_kind="rsi2")
+                growth_rot=None, nine_cap=None, lds_riskoff=False, ndx_cap=None, dip_kind="rsi2",
+                cash_yield=False, core_trend="sma", core_erc=False, vol_fast=False, def_relmom=None, def_lev_trend=False,
+                nine_buy_only=False, vol_target_trend=None, lds_max_lev=False, core_mom_weight=False)
 LEV_OF = {t: (a, L) for (a, L), t in ETF.items()}
 
 def p(k): return P.get(k, DEFAULTS[k])
@@ -68,8 +70,11 @@ def vol_switch(px, adj, date):
     if p("vol_vix"): v = float(adj["VIXLVL"].iloc[-1]) / 100 * 3
     elif p("vol_ewm_hl"): v = float(np.sqrt(r.iloc[-200:].ewm(halflife=p("vol_ewm_hl")).var().iloc[-1] * 252))
     else:
-        r = r.iloc[-P["vol_lookback"]:]; v = float(r.std(ddof=1) * math.sqrt(252)) if len(r) >= P["vol_lookback"] else float("nan")
+        rr = r.iloc[-P["vol_lookback"]:]; v = float(rr.std(ddof=1) * math.sqrt(252)) if len(rr) >= P["vol_lookback"] else float("nan")
+        if p("vol_fast") and len(r) >= 10: v = max(v, float(r.iloc[-10:].std(ddof=1) * math.sqrt(252)))
     tgt = p("vol_target_winter") if p("vol_target_winter") and date.month in (11, 12, 1, 2, 3, 4) else P["vol_target"]
+    if p("vol_target_trend"):
+        q = adj["QQQ"].dropna(); tgt = p("vol_target_trend")[0] if float(q.iloc[-1]) > float(q.iloc[-200:].mean()) else p("vol_target_trend")[1]
     if not v or math.isnan(v): return 1.0, v
     return float(min(max((tgt / v) ** P["vol_power"], 0.0), 1.0)), v
 
@@ -132,7 +137,10 @@ def lds_exposures(adj):
         s = px[a]; sma = float(s.iloc[-P["sma_days"]:].mean()); up = float(s.iloc[-1]) >= sma
         v = te._vol(r[a], n); bm = np.nanmean([_mom(s, k) for k in p("mom_months")])
         diag[a] = dict(price=float(s.iloc[-1]), sma=sma, trend="UP" if up else "DOWN", vol63=v, mom_blend=float(bm))
-        if up: core[a] = 1.0 if p("core_ew") else 1 / v
+        m12 = _mom(s, 12)
+        if p("core_trend") == "or_mom": up = up or (m12 == m12 and m12 > 0)
+        elif p("core_trend") == "and_mom": up = up and (m12 == m12 and m12 > 0)
+        if up: core[a] = 1.0 if p("core_ew") else (max(bm, 0.0) + 1e-4) / v if p("core_mom_weight") else 1 / v
     if p("core_topk") and len(core) > p("core_topk"):
         keep = sorted(core, key=lambda a: -diag[a]["mom_blend"])[:p("core_topk")]; core = {a: core[a] for a in keep}
     def scale(w, V):
@@ -140,6 +148,11 @@ def lds_exposures(adj):
         tot = sum(abs(x) for x in w.values()); w = {a: x / tot for a, x in w.items()}
         ks = list(w); C = np.atleast_2d(np.cov(r[ks].iloc[-n:].values.T) * 252); x = np.array([w[a] for a in ks])
         pv = float(np.sqrt(max(x @ C @ x, 1e-12))); return {a: w[a] * V / pv for a in ks}
+    if p("core_erc") and len(core) > 1:                      # equal risk contribution using the covariance matrix
+        ks = list(core); C = np.cov(r[ks].iloc[-n:].values.T) * 252; w = np.array([core[a] for a in ks]); w = w / w.sum()
+        for _ in range(100):
+            rc = w * (C @ w); w = w * (rc.mean() / np.maximum(rc, 1e-12)) ** 0.5; w = w / w.sum()
+        core = dict(zip(ks, w))
     core = scale(core, P["lds_vol_target"])
     ov = {}
     for a in A:
@@ -163,11 +176,13 @@ def implement(expo, kmax=3):
             return L if e > 0 else -L
         ok = sorted(L for L in LEVS[a] if L > 0 and L <= k) or [1]          # extra assets: 1x or 3x only
         return ok[-1]
-    for k in [k for k in (1, 2, 3) if k <= kmax]:
+    for k in ([kmax] if p("lds_max_lev") else [k for k in (1, 2, 3) if k <= kmax]):
         caps = {}
         for a, e in expo.items():
             L = lev_for(a, e, k); caps[ETF[(a, L)]] = caps.get(ETF[(a, L)], 0) + abs(e) / abs(L)
-        if sum(caps.values()) <= 1 + 1e-9: return caps
+        if sum(caps.values()) <= 1 + 1e-9:
+            if p("lds_max_lev") and sum(caps.values()) < 1 - 1e-6: caps["BIL"] = caps.get("BIL", 0) + 1 - sum(caps.values())
+            return caps
     caps = {}
     for a, e in expo.items():
         L = lev_for(a, e, kmax); caps[ETF[(a, L)]] = caps.get(ETF[(a, L)], 0) + abs(e) / abs(L)
@@ -179,6 +194,8 @@ def lds_review_due(cal, d):
     if f == "day": return True
     if f == "month": return cal.is_month_end(d)
     if f == "2week": return cal.is_week_end(d) and d.isocalendar()[1] % 2 == 0
+    if f == "midmonth":
+        i = cal._pos.get(d); return d.day >= 15 and (i is None or i == 0 or cal.days[i - 1].day < 15 or cal.days[i - 1].month != d.month)
     raise ValueError(f)
 
 def step(st, date, adj, close, cal, divs=None, splits=None):
@@ -186,6 +203,9 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
     ev = []
     growth = [nine.get("gasset") or p("growth")[0]] if p("growth_rot") else list(p("growth")); deff = list(P["defensive"])
     prev = st["prev_close"]
+    if p("cash_yield") and prev:
+        for sl in st["sleeves"].values():
+            if sl["cash"] > 0: sl["cash"] *= 1 + close["RF"]
     if nine["initialized"] and prev:
         rq = np.mean([close[t] / prev[t] - 1 for t in growth])
         dh = nine.get("def_hold") or deff
@@ -203,6 +223,7 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
         target = nine["last_target"] * (1 + P["sig_rate"]) + 0.5 * nine["new_cash"]
         diff = target - nine["S"]
         if diff < 0 and nine["skips"] > 0: nine["skips"] -= 1
+        elif diff < 0 and p("nine_buy_only"): pass
         elif diff < 0: nine["S"] += diff; nine["B"] -= diff
         else: buy = min(diff, nine["B"]); nine["S"] += buy; nine["B"] -= buy
         nine["last_target"] = nine["S"]; nine["new_cash"] = 0.0; nine_trade = True
@@ -266,6 +287,11 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
     if p("def_trend"):
         def_new = [t for t in deff if float(adj[t].iloc[-1]) >= float(adj[t].iloc[-p("def_sma"):].mean())] or ["BIL"]
         if len(def_new) < len(deff) and "BIL" not in def_new: def_new = def_new + ["BIL"] * (len(deff) - len(def_new))
+    if p("def_relmom"):
+        sc = {t: _mom(adj[t].dropna(), p("def_relmom")) for t in deff}; def_new = [max(sc, key=sc.get)]
+    if p("def_lev_trend"):
+        lev = {"TLT": "TMF", "GLD": "UGL", "IEF": "TYD"}
+        def_new = [lev.get(t, t) if float(adj[t].iloc[-1]) >= _sma(adj[t].dropna(), 200) else "BIL" for t in deff]
     def_changed = (nine.get("def_hold") or deff) != def_new
     if abs(w_new - nine["w"]) > 1e-9 or nine_trade or def_changed:
         nine["w"] = w_new; nine["def_hold"] = def_new

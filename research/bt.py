@@ -16,6 +16,7 @@ _A = pd.read_pickle(os.path.join(HERE, "data", "adj.pkl")).reindex(PANEL.index)
 for _c, _src in [("VIX3M", _X["^VIX3M"]), ("VVIX", _X["^VVIX"]), ("VWEHX", _X["VWEHX"]), ("VBMFX", _X["VBMFX"]), ("VFITX", _A["VFITX"]),
                  ("QQQ_H", _X["QQQ_H"]), ("QQQ_L", _X["QQQ_L"]), ("QQQ_C", _X["QQQ_C"])]:
     PANEL[_c] = _src.ffill() if not _c.startswith("QQQ_") else _src      # signals only, never traded
+PANEL["RF"] = pd.read_pickle(os.path.join(HERE, "data", "rf.pkl")).reindex(PANEL.index).fillna(0.0)   # daily T-bill return (cash yield)
 WIN = 300                                     # history rows each step needs (210d SMA, 12m momentum, 63d cov)
 _BASE_P = dict(te.P)
 
