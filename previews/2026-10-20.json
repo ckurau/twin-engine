@@ -1,0 +1,81 @@
+{
+ "generated": "2026-10-20T15:15:30",
+ "date": "2026-10-20",
+ "version": "1.6.0",
+ "orders": [
+  {
+   "ticker": "TQQQ",
+   "side": "SELL",
+   "shares": 52.0,
+   "est_price": 70.53,
+   "est_value": 3667.61,
+   "reasons": [
+    "LDS: LDS rebalance: v1.6 rule change (no QQQ)"
+   ]
+  },
+  {
+   "ticker": "TMV",
+   "side": "BUY",
+   "shares": 1.0,
+   "est_price": 45.56,
+   "est_value": 45.56,
+   "reasons": [
+    "LDS: LDS rebalance: v1.6 rule change (no QQQ)"
+   ]
+  },
+  {
+   "ticker": "UPRO",
+   "side": "BUY",
+   "shares": 25.0,
+   "est_price": 149.39,
+   "est_value": 3734.75,
+   "reasons": [
+    "LDS: LDS rebalance: v1.6 rule change (no QQQ)"
+   ]
+  }
+ ],
+ "trades": [
+  {
+   "date": "2026-10-20",
+   "sleeve": "LDS",
+   "ticker": "TQQQ",
+   "side": "SELL",
+   "shares": 52.0,
+   "price": 70.5309,
+   "value": 3667.61,
+   "reason": "LDS rebalance: v1.6 rule change (no QQQ)",
+   "realized_pl": 119.98,
+   "realized_pct": 3.38,
+   "hold_days": 4.0,
+   "term": "SHORT"
+  },
+  {
+   "date": "2026-10-20",
+   "sleeve": "LDS",
+   "ticker": "UPRO",
+   "side": "BUY",
+   "shares": 25,
+   "price": 149.3899,
+   "value": 3734.75,
+   "reason": "LDS rebalance: v1.6 rule change (no QQQ)"
+  },
+  {
+   "date": "2026-10-20",
+   "sleeve": "LDS",
+   "ticker": "TMV",
+   "side": "BUY",
+   "shares": 1,
+   "price": 45.5641,
+   "value": 45.56,
+   "reason": "LDS rebalance: v1.6 rule change (no QQQ)"
+  }
+ ],
+ "events": [
+  "LDS rebalanced (turnover 74%)"
+ ],
+ "warnings": [],
+ "close_time": "16:00",
+ "prices_as_of": "15:15 ET",
+ "est_value_after": 20421.35,
+ "status": "orders"
+}
