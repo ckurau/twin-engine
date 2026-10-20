@@ -1,0 +1,165 @@
+{
+ "generated": "2026-10-19T20:10:38-04:00",
+ "generated_et": "Mon Oct 19, 8:10 PM ET",
+ "overall": "warn",
+ "counts": {
+  "fail": 0,
+  "warn": 3,
+  "pending": 0,
+  "ok": 14,
+  "info": 3
+ },
+ "version": "1.6.0",
+ "schedule": "Every 30 minutes on weekdays 9:25 AM - 5:55 PM ET (cron-job.org), right after each preview and daily run, and hourly as a backup.",
+ "checks": [
+  {
+   "group": "Schedule",
+   "name": "Daily run booked the last close",
+   "status": "ok",
+   "detail": "Account is as of the Mon Oct 19 close.",
+   "fix": ""
+  },
+  {
+   "group": "Schedule",
+   "name": "Today's order preview",
+   "status": "warn",
+   "detail": "No preview was recorded today. The daily run still books the paper close.",
+   "fix": "Check the 'Preview orders' runs in GitHub Actions."
+  },
+  {
+   "group": "Schedule",
+   "name": "Recent workflow runs",
+   "status": "ok",
+   "detail": "Latest run of each workflow succeeded (5 workflows).",
+   "fix": ""
+  },
+  {
+   "group": "Schedule",
+   "name": "On-time trigger (cron-job.org)",
+   "status": "warn",
+   "detail": "No cron-job.org preview start seen today; daily run started Mon 06:24 PM ET.",
+   "fix": "Open cron-job.org > Cronjobs > History. A 401/403 means the GitHub token expired or was pasted wrong; 404 means the URL is wrong."
+  },
+  {
+   "group": "Schedule",
+   "name": "Workflows enabled",
+   "status": "ok",
+   "detail": "All 6 workflows are active.",
+   "fix": ""
+  },
+  {
+   "group": "Dashboard",
+   "name": "Dashboard is published and current",
+   "status": "ok",
+   "detail": "Live page shows the Mon Oct 19 close.",
+   "fix": ""
+  },
+  {
+   "group": "Data",
+   "name": "Price data (Yahoo Finance)",
+   "status": "warn",
+   "detail": "Yahoo doesn't have the Oct 19 close yet (latest Oct 16, 4 h after that close).",
+   "fix": "Usually Yahoo catches up within hours. If this is still failing by the next morning, ask Claude."
+  },
+  {
+   "group": "Data",
+   "name": "Price sanity",
+   "status": "ok",
+   "detail": "No price jumps above 35% in the last week (no unhandled splits).",
+   "fix": ""
+  },
+  {
+   "group": "Account",
+   "name": "Cash, shares and prices",
+   "status": "ok",
+   "detail": "No negative cash or shares; all 6 holdings priced.",
+   "fix": ""
+  },
+  {
+   "group": "Account",
+   "name": "9Sig bookkeeping",
+   "status": "ok",
+   "detail": "Growth + reserve = $10,184 vs sleeve $10,184 (0.0% apart).",
+   "fix": ""
+  },
+  {
+   "group": "Account",
+   "name": "Engine split",
+   "status": "ok",
+   "detail": "9Sig 50% / LDS 50% (reset to 50/50 each Dec 31).",
+   "fix": ""
+  },
+  {
+   "group": "Account",
+   "name": "Fed-day swap",
+   "status": "ok",
+   "detail": "No swap open.",
+   "fix": ""
+  },
+  {
+   "group": "Account",
+   "name": "No missed days",
+   "status": "ok",
+   "detail": "Every close since Oct 16, 2026 is booked (2 days).",
+   "fix": ""
+  },
+  {
+   "group": "Account",
+   "name": "Preview matched the booked close",
+   "status": "info",
+   "detail": "No preview to compare yet.",
+   "fix": ""
+  },
+  {
+   "group": "Configuration",
+   "name": "Versions match",
+   "status": "ok",
+   "detail": "Engine 1.6.0, dashboard data 1.6.0, backtest 1.6.0.",
+   "fix": ""
+  },
+  {
+   "group": "Configuration",
+   "name": "Fed meeting dates",
+   "status": "ok",
+   "detail": "10 scheduled decisions left in the list (last Dec 08, 2027).",
+   "fix": ""
+  },
+  {
+   "group": "Configuration",
+   "name": "Market holiday calendar",
+   "status": "ok",
+   "detail": "Covers trading days through Oct 20, 2027.",
+   "fix": ""
+  },
+  {
+   "group": "Configuration",
+   "name": "cron-job.org GitHub token",
+   "status": "ok",
+   "detail": "Expires Oct 19, 2027 (365 days).",
+   "fix": ""
+  },
+  {
+   "group": "Reminders",
+   "name": "Go live: buy the paper account's positions in the Roth as MOC orders",
+   "status": "info",
+   "detail": "Mon Oct 26. Use the share counts on the Positions tab so later orders match the dashboard.",
+   "fix": ""
+  },
+  {
+   "group": "Live trading",
+   "name": "Real account matches the paper account",
+   "status": "info",
+   "detail": "Not checked automatically: there is no connection to Schwab yet. Compare your Schwab positions with the Positions tab after each order day.",
+   "fix": ""
+  }
+ ],
+ "history": [
+  {
+   "t": "2026-10-19T20:10:38-04:00",
+   "overall": "warn",
+   "fails": 0,
+   "warns": 3
+  }
+ ],
+ "fail_sig": ""
+}
