@@ -1,13 +1,13 @@
 {
- "generated": "2026-10-20T14:25:28-04:00",
- "generated_et": "Tue Oct 20, 2:25 PM ET",
- "overall": "fail",
+ "generated": "2026-10-20T14:55:31-04:00",
+ "generated_et": "Tue Oct 20, 2:55 PM ET",
+ "overall": "warn",
  "counts": {
-  "fail": 1,
+  "fail": 0,
   "fixing": 0,
   "warn": 1,
   "pending": 1,
-  "ok": 14,
+  "ok": 15,
   "info": 4
  },
  "version": "1.6.0",
@@ -58,9 +58,9 @@
   {
    "group": "Data",
    "name": "Price data (Yahoo Finance)",
-   "status": "fail",
-   "detail": "No Oct 19 close yet for: SOXL.",
-   "fix": "Usually fixes itself within hours; if it persists into the next session, ask Claude."
+   "status": "ok",
+   "detail": "All 22 tickers have the Oct 19 close.",
+   "fix": ""
   },
   {
    "group": "Data",
@@ -162,6 +162,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-20T14:55:31-04:00",
+   "overall": "warn",
+   "fails": 0,
+   "warns": 1
+  },
   {
    "t": "2026-10-20T14:25:28-04:00",
    "overall": "fail",
@@ -301,5 +307,5 @@
   "log": []
  },
  "pages_lag_since": null,
- "fail_sig": "Price data (Yahoo Finance)No Oct 19 close yet for: SOXL."
+ "fail_sig": ""
 }
