@@ -420,7 +420,7 @@ function renderOverview(){
     </div>
   </div>
 
-  ${(D.todo || []).length ? `<div class="card"><div class="h2">To do <span class="r muted">${D.todo.length} open</span></div><div class="list">${D.todo.map(x => `<div class="li"><div class="when" style="min-width:92px"><span class="pill ${x.kind === "Decide" ? "neutral" : x.kind === "Before go-live" ? "dn" : "e1"}">${esc(x.kind)}</span></div><div class="what"><b>${esc(x.what)}</b><div class="muted" style="font-size:12.5px">${esc(x.note)}</div></div></div>`).join("")}</div></div>` : ""}
+  ${(D.todo || []).length ? `<div class="card"><div class="h2">To do <span class="r muted">${D.todo.length} open</span></div><div class="list">${D.todo.map(x => `<div class="li"><div class="when" style="min-width:92px"><span class="pill ${x.kind === "Tonight" ? "dn" : x.kind === "Decide" ? "neutral" : "e1"}">${esc(x.kind)}</span></div><div class="what"><b>${esc(x.what)}</b><div class="muted" style="font-size:12.5px">${esc(x.note)}</div></div></div>`).join("")}</div></div>` : ""}
 
   ${datesCard()}
 

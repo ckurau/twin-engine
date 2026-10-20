@@ -466,9 +466,10 @@ def next_fomc(cal, date):
 # Important dates shown on the dashboard (Overview > Important dates). Add or edit lines here: (date, what, why/how).
 # Open to-do items shown on the dashboard (Overview > To do). Remove a line when it's done.
 TODO = [
-    ("Setup", "Add the third cron-job.org job (Twin Engine health)", "Copy an existing job: URL .../workflows/health.yml/dispatches, Mon-Fri hours 9-17, minutes 25 and 55, body {\"ref\":\"main\"}. README 4 step 3b."),
-    ("Before go-live", "Fund the Roth", "About $14k there now; add the 2026 contribution (limit about $7,500) so it settles before Mon Oct 26."),
-    ("Before go-live", "Ask Schwab for the market-on-close cutoff time", "Until confirmed, enter orders by 12:40 PM PT."),
+    ("Tonight", "Turn on failure alerts for all three cron-job.org jobs", "Each job > Edit > Notifications: tick 'execution of the cronjob fails' and 'succeeds after it failed before' > Save. (Health job added and tested Oct 19.)"),
+    ("Tonight", "Fund the Roth", "About $14k there now; add the 2026 contribution (limit about $7,500) tonight so it settles before Mon Oct 26."),
+    ("Before go-live", "Ask Schwab for the market-on-close cutoff time", "Schwab chat is open 24/7. Until confirmed, enter orders by 12:40 PM PT."),
+    ("Before go-live", "Dry run Tue-Fri: enter each preview's orders in thinkorswim without sending", "Tue Oct 20 at ~12:15 PM PT: the one-time v1.6 switch in LDS (sell TQQQ, buy UPRO)."),
     ("Decide", "Orders: fully automatic or one tap to approve?", "Fully automatic = orders placed ~12:15 PM PT with a pause switch. One tap = an Approve link; nothing trades if not tapped."),
     ("Decide", "Alerts: push app (ntfy / Pushover) or text message (Twilio)?", "Push is free or $5 one-time and supports Approve buttons; texts cost about $2/month and need ~2 weeks of carrier registration."),
     ("Decide", "Start the Schwab developer registration?", "developer.schwab.com: create an app and link the Roth. Approval takes days to weeks; needed for any automatic or one-tap ordering."),
