@@ -1,14 +1,14 @@
 {
- "generated": "2026-10-20T15:59:37-04:00",
- "generated_et": "Tue Oct 20, 3:59 PM ET",
+ "generated": "2026-10-20T16:21:01-04:00",
+ "generated_et": "Tue Oct 20, 4:21 PM ET",
  "overall": "warn",
  "counts": {
   "fail": 0,
   "fixing": 0,
-  "warn": 1,
-  "pending": 0,
+  "warn": 2,
+  "pending": 1,
   "ok": 16,
-  "info": 4
+  "info": 3
  },
  "version": "1.6.0",
  "schedule": "Every 30 minutes on weekdays 9:25 AM - 5:55 PM ET (cron-job.org), right after each preview and daily run, and hourly as a backup.",
@@ -17,7 +17,14 @@
    "group": "Schedule",
    "name": "Daily run booked the last close",
    "status": "ok",
-   "detail": "Account is as of the Mon Oct 19 close.",
+   "detail": "Account is as of the Tue Oct 20 close.",
+   "fix": ""
+  },
+  {
+   "group": "Schedule",
+   "name": "Today's close",
+   "status": "pending",
+   "detail": "The daily run books today's close at about Tue Oct 20, 4:20 PM ET.",
    "fix": ""
   },
   {
@@ -51,9 +58,9 @@
   {
    "group": "Dashboard",
    "name": "Dashboard is published and current",
-   "status": "ok",
-   "detail": "Live page shows the Mon Oct 19 close.",
-   "fix": ""
+   "status": "warn",
+   "detail": "Live page shows 2026-10-19, the repo has 2026-10-20. Usually a publish still in progress.",
+   "fix": "If this lasts over an hour: GitHub > Actions > 'pages build and deployment'."
   },
   {
    "group": "Data",
@@ -80,7 +87,7 @@
    "group": "Account",
    "name": "9Sig bookkeeping",
    "status": "ok",
-   "detail": "Growth + reserve = $10,184 vs sleeve $10,184 (0.0% apart).",
+   "detail": "Growth + reserve = $10,170 vs sleeve $10,170 (0.0% apart).",
    "fix": ""
   },
   {
@@ -101,14 +108,14 @@
    "group": "Account",
    "name": "No missed days",
    "status": "ok",
-   "detail": "Every close since Oct 16, 2026 is booked (2 days).",
+   "detail": "Every close since Oct 16, 2026 is booked (3 days).",
    "fix": ""
   },
   {
    "group": "Account",
    "name": "Preview matched the booked close",
-   "status": "info",
-   "detail": "No preview to compare yet.",
+   "status": "ok",
+   "detail": "2026-10-20: preview orders matched the booked trades (3 tickers).",
    "fix": ""
   },
   {
@@ -162,6 +169,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-20T16:21:01-04:00",
+   "overall": "warn",
+   "fails": 0,
+   "warns": 2
+  },
   {
    "t": "2026-10-20T15:59:37-04:00",
    "overall": "warn",
@@ -330,6 +343,6 @@
   "counts": {},
   "log": []
  },
- "pages_lag_since": null,
+ "pages_lag_since": "2026-10-20T16:21:01-04:00",
  "fail_sig": ""
 }
