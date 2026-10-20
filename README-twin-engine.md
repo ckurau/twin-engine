@@ -273,7 +273,9 @@ configuration (versions, Fed dates left, market calendar coverage, cron-job.org 
 
 It runs every 30 minutes on weekdays from 9:25 AM to 5:55 PM ET (cron-job.org), right after every preview and daily run, and hourly as a backup.
 The run about 10 minutes after the 3:15 PM ET preview leaves time to fix a missing preview before Schwab's MOC cutoff.
-A failure opens a GitHub issue (phone notification through the GitHub app); it closes itself when everything passes again. Warnings show only on the dashboard.
+**Automatic fixes** (before anyone is notified): a missing preview is started again (8 minutes apart), a close that wasn't booked starts the daily run again (25 minutes apart), disabled workflows are re-enabled, and the page is republished if it lags for 45+ minutes. Each fix runs at most 3 times a day; the check shows **Fixing** meanwhile and re-runs as soon as the fixed job finishes.
+A GitHub issue (phone notification through the GitHub app) is opened only when a fix doesn't work, when a problem needs a person (the account ledger is never changed automatically), or when a preview is still missing 15 minutes before the close. It closes itself when everything passes again. Warnings show only on the dashboard.
+**Watching the watcher:** turn on "notify on failure" for the three cron-job.org jobs, so cron-job.org emails you if GitHub stops accepting its calls (for example an expired token).
 
 ## 9. Dashboard guide
 
