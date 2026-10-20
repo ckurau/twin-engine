@@ -1,12 +1,12 @@
 {
- "generated": "2026-10-20T16:34:59-04:00",
- "generated_et": "Tue Oct 20, 4:34 PM ET",
+ "generated": "2026-10-20T16:55:28-04:00",
+ "generated_et": "Tue Oct 20, 4:55 PM ET",
  "overall": "ok",
  "counts": {
   "fail": 0,
   "fixing": 0,
   "warn": 0,
-  "pending": 1,
+  "pending": 0,
   "ok": 18,
   "info": 3
  },
@@ -18,13 +18,6 @@
    "name": "Daily run booked the last close",
    "status": "ok",
    "detail": "Account is as of the Tue Oct 20 close.",
-   "fix": ""
-  },
-  {
-   "group": "Schedule",
-   "name": "Today's close",
-   "status": "pending",
-   "detail": "The daily run books today's close at about Tue Oct 20, 4:20 PM ET.",
    "fix": ""
   },
   {
@@ -66,7 +59,7 @@
    "group": "Data",
    "name": "Price data (Yahoo Finance)",
    "status": "ok",
-   "detail": "All 22 tickers have the Oct 19 close.",
+   "detail": "All 22 tickers have the Oct 20 close.",
    "fix": ""
   },
   {
@@ -169,6 +162,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-20T16:55:28-04:00",
+   "overall": "ok",
+   "fails": 0,
+   "warns": 0
+  },
   {
    "t": "2026-10-20T16:34:59-04:00",
    "overall": "ok",
