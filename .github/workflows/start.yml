@@ -29,6 +29,7 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Open the account
         run: |
+          set -o pipefail
           if [ -f state.json ]; then echo "::error::An account already exists (state.json). Delete it in the repo first to start over."; exit 1; fi
           python twin_engine.py run --start "${{ inputs.start }}" --capital "${{ inputs.capital }}" --contrib "${{ inputs.contrib }}" --whole-shares | tee run.log
           { echo '```'; cat run.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

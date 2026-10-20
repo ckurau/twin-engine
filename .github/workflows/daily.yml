@@ -25,6 +25,7 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Run engine
         run: |
+          set -o pipefail
           if [ ! -f state.json ]; then echo "::error::No account yet. Run the 'Start account' workflow first."; exit 1; fi
           python twin_engine.py run | tee run.log
           { echo '```'; cat run.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

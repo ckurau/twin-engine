@@ -909,7 +909,9 @@ def main():
         if not dates: print("Already up to date.");
         cal = run_days(st, adj, close, dates, divs, spl)
         save_state(st)
-        write_summary(build_summary(st, adj, close.ffill(limit=5).loc[pd.Timestamp(st["last_date"])].to_dict(), cal))
+        ld = pd.Timestamp(st["last_date"])     # Yahoo sometimes drops a recent day it already published: use the latest prices it still has
+        cff = close.ffill(limit=5); cff = cff.reindex(cff.index.union([ld])).ffill()
+        write_summary(build_summary(st, adj, cff.loc[ld].to_dict(), cal))
         print(f"Portfolio value: ${st['equity'][-1]['value']:,.2f}  (summary.json written)")
         w = fomc_list_warning(pd.Timestamp(st["last_date"]))
         if w: print("WARNING:", w)
