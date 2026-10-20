@@ -466,7 +466,6 @@ def next_fomc(cal, date):
 # Important dates shown on the dashboard (Overview > Important dates). Add or edit lines here: (date, what, why/how).
 # Open to-do items shown on the dashboard (Overview > To do). Remove a line when it's done.
 TODO = [
-    ("Tonight", "Turn on failure alerts for all three cron-job.org jobs", "Each job > Edit > Notifications: tick 'execution of the cronjob fails' and 'succeeds after it failed before' > Save. (Health job added and tested Oct 19.)"),
     ("Tonight", "Fund the Roth", "About $14k there now; add the 2026 contribution (limit about $7,500) tonight so it settles before Mon Oct 26."),
     ("Before go-live", "Ask Schwab for the market-on-close cutoff time", "Schwab chat is open 24/7. Until confirmed, enter orders by 12:40 PM PT."),
     ("Before go-live", "Dry run Tue-Fri: enter each preview's orders in thinkorswim without sending", "Tue Oct 20 at ~12:15 PM PT: the one-time v1.6 switch in LDS (sell TQQQ, buy UPRO)."),
