@@ -1,13 +1,13 @@
 {
- "generated": "2026-10-20T16:21:01-04:00",
- "generated_et": "Tue Oct 20, 4:21 PM ET",
+ "generated": "2026-10-20T16:25:27-04:00",
+ "generated_et": "Tue Oct 20, 4:25 PM ET",
  "overall": "warn",
  "counts": {
   "fail": 0,
   "fixing": 0,
-  "warn": 2,
+  "warn": 1,
   "pending": 1,
-  "ok": 16,
+  "ok": 17,
   "info": 3
  },
  "version": "1.6.0",
@@ -58,9 +58,9 @@
   {
    "group": "Dashboard",
    "name": "Dashboard is published and current",
-   "status": "warn",
-   "detail": "Live page shows 2026-10-19, the repo has 2026-10-20. Usually a publish still in progress.",
-   "fix": "If this lasts over an hour: GitHub > Actions > 'pages build and deployment'."
+   "status": "ok",
+   "detail": "Live page shows the Tue Oct 20 close.",
+   "fix": ""
   },
   {
    "group": "Data",
@@ -169,6 +169,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-20T16:25:27-04:00",
+   "overall": "warn",
+   "fails": 0,
+   "warns": 1
+  },
   {
    "t": "2026-10-20T16:21:01-04:00",
    "overall": "warn",
@@ -343,6 +349,6 @@
   "counts": {},
   "log": []
  },
- "pages_lag_since": "2026-10-20T16:21:01-04:00",
+ "pages_lag_since": null,
  "fail_sig": ""
 }
