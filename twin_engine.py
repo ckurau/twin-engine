@@ -677,11 +677,36 @@ def fetch_yf(years=3, tries=4):
         if d is not None and len(d) and all(t in d["Close"] and d["Close"][t].notna().any() for t in SIGNAL_TICKERS): break
         if i == tries - 1: raise RuntimeError("Price download from Yahoo failed (empty or missing tickers) - nothing was changed. Try again later.")
         time.sleep(30 * (i + 1))
+    d = _refetch_gaps(d, years)
     adj, close = _naive(d["Adj Close"]), _naive(d["Close"])
     divs = _naive(d["Dividends"]) if "Dividends" in d else None; spl = _naive(d["Stock Splits"]) if "Stock Splits" in d else None
     adj, close = adj.dropna(how="all"), close.dropna(how="all")
     close, divs = unadjust_splits(close, divs, spl)
     return adj, close, divs, spl
+
+def _refetch_gaps(d, years):
+    """yfinance's multi-ticker download sometimes drops a ticker (e.g. 'database is locked' in its cache).
+    Re-download any ticker that is missing or has no price on the latest date, one at a time."""
+    import time, yfinance as yf
+    c = d["Close"]; last = c.dropna(how="all").index[-1]
+    gaps = [t for t in ALL_TICKERS if t not in c or c[t].notna().sum() == 0 or not (c[t].get(last, float("nan")) > 0)]
+    for t in gaps:
+        for k in range(3):
+            try:
+                one = yf.download(t, period=f"{years}y", auto_adjust=False, actions=True, progress=False, threads=False)
+                if one is not None and len(one) and one["Close"].notna().any().all():
+                    one.columns = [col[0] if isinstance(col, tuple) else col for col in one.columns]
+                    for field in ("Adj Close", "Close", "Dividends", "Stock Splits"):
+                        if field in one and (field, t) in d.columns:
+                            d[(field, t)] = one[field].reindex(d.index)
+                        elif field in one:
+                            d[(field, t)] = one[field].reindex(d.index)
+                    print(f"Re-downloaded {t} separately (it was missing from the batch download).")
+                    break
+            except Exception as e:
+                print(f"Retry {k + 1} for {t} failed: {e}")
+            time.sleep(3)
+    return d
 
 def day_prices(close_ff, d, st):
     """closes for day d (forward-filled up to 5 days for stray gaps). Abort if a held or tradable ETF has no price."""

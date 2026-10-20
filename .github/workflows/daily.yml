@@ -10,6 +10,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+  issues: write       # closes the day's order notification once the close is booked
 concurrency:
   group: twin-engine
   cancel-in-progress: false
@@ -36,4 +37,12 @@ jobs:
           git add state.json summary.json
           if git diff --cached --quiet state.json && [ "${{ github.event_name }}" = "schedule" ]; then echo "No new close booked."; exit 0; fi
           git diff --cached --quiet && { echo "Nothing changed."; exit 0; }
-          git commit -m "Daily run $(TZ=America/New_York date +%F)"; git pull --rebase; git push
+          git commit -m "Daily run $(TZ=America/New_York date +%F)"; for i in 1 2 3 4; do git pull --rebase -X theirs && git push && break; sleep $((i * 5)); done; git push
+      - name: Close today's order notification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          booked=$(python -c "import json; print(json.load(open('state.json'))['last_date'])")
+          for n in $(gh issue list --state open --search "Orders in:title" --json number,title --jq ".[] | select(.title | startswith(\"Orders \")) | select(.title[7:17] <= \"$booked\") | .number"); do
+            gh issue close "$n" --comment "Booked at the $booked close. See the dashboard's Trades tab." || true
+          done

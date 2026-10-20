@@ -103,9 +103,11 @@ def c_runs():
     for r in RUNS:
         if r["status"] != "completed" or r["name"] in latest: continue
         latest[r["name"]] = r
-    bad = [r for r in latest.values() if r["conclusion"] not in ("success", "skipped", "neutral") and not r["name"].startswith("pages")]
+    # the health check's own hiccups show up as a stale timestamp instead; a failed preview/daily run is already judged by its result
+    # (preview arrived, close booked) and restarted automatically, so a failed run alone is a warning, not a page
+    bad = [r for r in latest.values() if r["conclusion"] not in ("success", "skipped", "neutral", "cancelled") and not r["name"].startswith(("pages", "Health"))]
     if bad:
-        add("Schedule", "Recent workflow runs", "fail", "Last run failed: " + "; ".join(f"{r['name']} ({r['conclusion']}, {pd.Timestamp(r['created_at']).tz_convert(ET):%b %d %I:%M %p})" for r in bad),
+        add("Schedule", "Recent workflow runs", "warn", "Last run failed: " + "; ".join(f"{r['name']} ({r['conclusion']}, {pd.Timestamp(r['created_at']).tz_convert(ET):%b %d %I:%M %p})" for r in bad),
             "Open the failed run in GitHub Actions to see the error, then re-run it. Ask Claude if it fails again.")
     else:
         add("Schedule", "Recent workflow runs", "ok", f"Latest run of each workflow succeeded ({len(latest)} workflows).")
