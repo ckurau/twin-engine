@@ -1,14 +1,14 @@
 {
- "generated": "2026-10-19T20:35:48-04:00",
- "generated_et": "Mon Oct 19, 8:35 PM ET",
- "overall": "warn",
+ "generated": "2026-10-20T09:25:35-04:00",
+ "generated_et": "Tue Oct 20, 9:25 AM ET",
+ "overall": "ok",
  "counts": {
   "fail": 0,
   "fixing": 0,
-  "warn": 3,
-  "pending": 0,
-  "ok": 14,
-  "info": 3
+  "warn": 0,
+  "pending": 1,
+  "ok": 16,
+  "info": 4
  },
  "version": "1.6.0",
  "schedule": "Every 30 minutes on weekdays 9:25 AM - 5:55 PM ET (cron-job.org), right after each preview and daily run, and hourly as a backup.",
@@ -23,23 +23,23 @@
   {
    "group": "Schedule",
    "name": "Today's order preview",
-   "status": "warn",
-   "detail": "No preview was recorded today. The daily run still books the paper close.",
-   "fix": "Check the 'Preview orders' runs in GitHub Actions."
+   "status": "pending",
+   "detail": "Due at about Tue Oct 20, 3:15 PM ET.",
+   "fix": ""
   },
   {
    "group": "Schedule",
    "name": "Recent workflow runs",
    "status": "ok",
-   "detail": "Latest run of each workflow succeeded (5 workflows).",
+   "detail": "Latest run of each workflow succeeded (4 workflows).",
    "fix": ""
   },
   {
    "group": "Schedule",
    "name": "On-time trigger (cron-job.org)",
-   "status": "warn",
-   "detail": "No cron-job.org preview start seen today; daily run started Mon 06:24 PM ET.",
-   "fix": "Open cron-job.org > Cronjobs > History. A 401/403 means the GitHub token expired or was pasted wrong; 404 means the URL is wrong."
+   "status": "ok",
+   "detail": "Daily run started Mon 06:24 PM ET.",
+   "fix": ""
   },
   {
    "group": "Schedule",
@@ -58,9 +58,9 @@
   {
    "group": "Data",
    "name": "Price data (Yahoo Finance)",
-   "status": "warn",
-   "detail": "Yahoo doesn't have the Oct 19 close yet (latest Oct 16, 5 h after that close).",
-   "fix": "Usually Yahoo catches up within hours. If this is still failing by the next morning, ask Claude."
+   "status": "ok",
+   "detail": "All 22 tickers have the Oct 19 close.",
+   "fix": ""
   },
   {
    "group": "Data",
@@ -136,7 +136,7 @@
    "group": "Configuration",
    "name": "cron-job.org GitHub token",
    "status": "ok",
-   "detail": "Expires Oct 19, 2027 (365 days).",
+   "detail": "Expires Oct 19, 2027 (364 days).",
    "fix": ""
   },
   {
@@ -144,6 +144,13 @@
    "name": "Go live: buy the paper account's positions in the Roth as MOC orders",
    "status": "info",
    "detail": "Mon Oct 26. Use the share counts on the Positions tab so later orders match the dashboard.",
+   "fix": ""
+  },
+  {
+   "group": "Reminders",
+   "name": "First live Fed-day swap: LDS sleeve into SOXL at the close",
+   "status": "info",
+   "detail": "Tue Oct 27. Swap back at the close on Wed Oct 28.",
    "fix": ""
   },
   {
@@ -155,6 +162,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-20T09:25:35-04:00",
+   "overall": "ok",
+   "fails": 0,
+   "warns": 0
+  },
   {
    "t": "2026-10-19T20:35:48-04:00",
    "overall": "warn",
@@ -211,7 +224,7 @@
   }
  ],
  "remediation": {
-  "date": "2026-10-19",
+  "date": "2026-10-20",
   "counts": {},
   "log": []
  },
