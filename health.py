@@ -24,9 +24,13 @@ checks = []
 def add(group, name, status, detail, fix=""):
     checks.append(dict(group=group, name=name, status=status, detail=detail, fix=fix))
 
+DRY = bool(os.environ.get("HEALTH_DRY"))     # test mode: log fixes and issues instead of sending them
+
 def api(path, method="GET", body=None):
-    req = urllib.request.Request(f"https://api.github.com/repos/{REPO}/{path}", method=method,
-                                 data=json.dumps(body).encode() if body is not None else None,
+    if DRY and method != "GET":
+        print(f"[dry run] would {method} {path} {json.dumps(body) if body else ''}"); return {}
+    data = json.dumps(body).encode() if body is not None else (b"" if method in ("POST", "PUT") else None)
+    req = urllib.request.Request(f"https://api.github.com/repos/{REPO}/{path}", method=method, data=data,
                                  headers={"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
                                           **({"Authorization": f"Bearer {TOKEN}"} if TOKEN else {})})
     with urllib.request.urlopen(req, timeout=20) as r:
@@ -45,7 +49,7 @@ def safe(fn):
 # ---------------------------------------------------------------------------- market clock
 import exchange_calendars as xcals
 CAL = xcals.get_calendar("XNYS")
-NOW = dt.datetime.now(ET)
+NOW = dt.datetime.fromisoformat(os.environ["HEALTH_NOW"]).astimezone(ET) if os.environ.get("HEALTH_NOW") else dt.datetime.now(ET)   # HEALTH_NOW: tests only
 TODAY = pd.Timestamp(NOW.date())
 IS_SESSION = CAL.is_session(TODAY)
 CLOSE = CAL.session_close(TODAY).tz_convert(ET).to_pydatetime() if IS_SESSION else None
@@ -245,16 +249,72 @@ def c_config():
     for r in soon: add("Reminders", r["what"], "info", f"{pd.Timestamp(r['date']):%a %b %d}. {r['note']}")
     add("Live trading", "Real account matches the paper account", "info", "Not checked automatically: there is no connection to Schwab yet. Compare your Schwab positions with the Positions tab after each order day.")
 
+# ---------------------------------------------------------------------------- automatic fixes
+MAX_TRIES = 3          # per problem per day; after that the problem is reported (GitHub issue -> phone)
+prev_health = load(HEALTH_PATH, {}) or {}
+rem = prev_health.get("remediation", {})
+if rem.get("date") != str(TODAY.date()): rem = dict(date=str(TODAY.date()), counts={}, log=rem.get("log", [])[:30])
+
+def running(name_start):
+    return any(r["name"].startswith(name_start) and r["status"] in ("queued", "in_progress", "waiting", "pending") for r in RUNS)
+
+SPACING = {"preview": 8, "daily": 25, "pages": 30, "enable": 30}   # minutes between tries (the health check also runs right after each run)
+
+def fix(key, check_name, action, label):
+    """try an automatic fix; the failed check becomes 'fixing' (no notification) unless today's tries are used up"""
+    c = next((c for c in checks if c["name"] == check_name and c["status"] == "fail"), None)
+    if c is None: return
+    tries = rem["counts"].get(key, 0)
+    last = rem.setdefault("last", {}).get(key)
+    if last and tries < MAX_TRIES and (NOW - dt.datetime.fromisoformat(last)).total_seconds() < SPACING[key] * 60:
+        c["status"] = "fixing"; c["detail"] += f" Automatic fix tried {tries} time(s); next try after {SPACING[key]} minutes."; return
+    if tries >= MAX_TRIES:
+        c["detail"] += f" Automatic fix tried {tries} times today without success."; return
+    try:
+        action(); rem["counts"][key] = tries + 1; rem["last"][key] = NOW.isoformat(timespec="seconds")
+        rem["log"].insert(0, dict(t=NOW.isoformat(timespec="seconds"), what=label, result="started"))
+        c["status"] = "fixing"; c["detail"] += f" Automatic fix: {label} (try {tries + 1} of {MAX_TRIES}). The health check runs again when it finishes."
+        if key == "preview" and NOW >= CLOSE - dt.timedelta(minutes=15): c["status"] = "fail"   # too close to the MOC cutoff: tell the owner too
+    except Exception as e:
+        rem["log"].insert(0, dict(t=NOW.isoformat(timespec="seconds"), what=label, result=f"could not start: {e}"))
+        c["detail"] += f" Automatic fix could not start: {e}"
+
+def remediate():
+    if not TOKEN: return
+    # preview missing close to the cutoff: start it now (the engine's window check stops it if it's too late)
+    if IS_SESSION and NOW < CLOSE - dt.timedelta(minutes=6) and not running("Preview"):
+        fix("preview", "Today's order preview", lambda: api("actions/workflows/preview.yml/dispatches", "POST", {"ref": "main", "inputs": {"window": "true"}}),
+            "started 'Preview orders'")
+    # close not booked (late, failed or crashed run): start the daily run again - it only books closes that are final
+    if not running("Daily"):
+        fix("daily", "Daily run booked the last close", lambda: api("actions/workflows/daily.yml/dispatches", "POST", {"ref": "main"}), "started 'Daily run'")
+    # a disabled workflow: switch it back on
+    c = next((c for c in checks if c["name"] == "Workflows enabled" and c["status"] == "fail"), None)
+    if c:
+        def enable():
+            for w in api("actions/workflows").get("workflows", []):
+                if w["state"] != "active": api(f"actions/workflows/{w['id']}/enable", "PUT")
+        fix("enable", "Workflows enabled", enable, "re-enabled the disabled workflows")
+    # live dashboard behind the repo for a while: ask GitHub Pages to publish again
+    c = next((c for c in checks if c["name"] == "Dashboard is published and current" and c["status"] in ("warn", "fail")), None)
+    lag_min = (NOW - dt.datetime.fromisoformat(prev_health["pages_lag_since"])).total_seconds() / 60 if prev_health.get("pages_lag_since") else 0
+    if c and (c["status"] == "fail" or lag_min >= 45):
+        c["status"] = "fail"; fix("pages", "Dashboard is published and current", lambda: api("pages/builds", "POST"), "asked GitHub Pages to republish")
+    # a failed preview/daily run whose problem is already gone needs nothing; other failed workflows are reported as they are
+
 # ---------------------------------------------------------------------------- run
 for fn in (c_daily, c_preview, c_runs, c_trigger, c_workflows, c_pages, c_data, c_state, c_preview_vs_booked, c_config): safe(fn)
-order = {"fail": 0, "warn": 1, "pending": 2, "ok": 3, "info": 4}
+try: remediate()
+except Exception as e: add("Health check", "Automatic fixes", "warn", f"Automatic fixes crashed: {e}")
+order = {"fail": 0, "fixing": 1, "warn": 2, "pending": 3, "ok": 4, "info": 5}
 n = {k: sum(c["status"] == k for c in checks) for k in order}
-overall = "fail" if n["fail"] else ("warn" if n["warn"] else "ok")
+overall = "fail" if n["fail"] else ("warn" if n["warn"] or n["fixing"] else "ok")
 prev = load(HEALTH_PATH, {})
 hist = ([dict(t=NOW.isoformat(timespec="seconds"), overall=overall, fails=n["fail"], warns=n["warn"])] + prev.get("history", []))[:60]
 out = dict(generated=NOW.isoformat(timespec="seconds"), generated_et=fmt_t(NOW), overall=overall, counts=n, version=te.VERSION,
            schedule="Every 30 minutes on weekdays 9:25 AM - 5:55 PM ET (cron-job.org), right after each preview and daily run, and hourly as a backup.",
-           checks=checks, history=hist)
+           checks=checks, history=hist, remediation=rem,
+           pages_lag_since=(prev_health.get("pages_lag_since") or NOW.isoformat(timespec="seconds")) if any(c["name"].startswith("Dashboard is published") and c["status"] != "ok" for c in checks) else None)
 with open(HEALTH_PATH, "w") as f: json.dump(out, f, indent=1)
 print(f"{overall.upper()}  fail {n['fail']} warn {n['warn']} ok {n['ok']}  ({fmt_t(NOW)})")
 for c in checks: print(f"  [{c['status']:7s}] {c['group']}: {c['name']} - {c['detail']}")

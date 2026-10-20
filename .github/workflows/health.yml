@@ -1,6 +1,7 @@
 name: Health check
 # Checks everything the system depends on and writes health.json (dashboard Health tab).
-# Opens a GitHub issue (phone notification) when a check fails; closes it when all pass again.
+# Fixes what it safely can (starts a missing preview / daily run, re-enables workflows, republishes the page) and opens a
+# GitHub issue (phone notification) only for what it can't fix; closes it when all pass again.
 # Started every 30 minutes on weekdays by cron-job.org (New York time), right after each preview / daily run,
 # and hourly by GitHub's own (sometimes late) schedule as a backup.
 on:
@@ -13,9 +14,10 @@ on:
 permissions:
   contents: write
   issues: write
-  actions: read
+  actions: write      # automatic fixes: start preview/daily, re-enable workflows
+  pages: write        # automatic fixes: republish the dashboard
 concurrency:
-  group: twin-engine
+  group: twin-engine-health     # own queue, so a health run never displaces a waiting preview or daily run
   cancel-in-progress: false
 jobs:
   health:

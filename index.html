@@ -68,7 +68,7 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;backgroun
 .hrow{display:grid;grid-template-columns:92px 1fr;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
 .hrow:first-child{border-top:0}
 .hst{font:600 10.5px/1 var(--f-body);letter-spacing:.06em;text-transform:uppercase;padding:6px 8px;border-radius:999px;text-align:center;align-self:start}
-.hst.ok{background:var(--up-soft);color:var(--up)} .hst.fail{background:var(--dn-soft);color:var(--dn)} .hst.warn{background:color-mix(in srgb, var(--warn) 18%, transparent);color:var(--warn)}
+.hst.ok{background:var(--up-soft);color:var(--up)} .hst.fixing{background:var(--e1-soft);color:var(--e1)} .hst.fail{background:var(--dn-soft);color:var(--dn)} .hst.warn{background:color-mix(in srgb, var(--warn) 18%, transparent);color:var(--warn)}
 .hst.pending,.hst.info{background:var(--card2);color:var(--fg2);border:1px solid var(--line)}
 .hfix{margin-top:4px;font-size:13px;color:var(--fg)}
 .hhist{display:flex;gap:3px;flex-wrap:wrap;margin-top:8px}
@@ -818,25 +818,26 @@ function healthStale(){
 function renderHealth(){
   const el = $("#health"); if (!el) return;
   if (!HL) { el.innerHTML = '<div class="card empty">No health check has run yet. It starts automatically every 30 minutes on weekdays.</div>'; return; }
-  const lab = {ok: "OK", fail: "Problem", warn: "Warning", pending: "Pending", info: "Info"};
+  const lab = {ok: "OK", fail: "Problem", warn: "Warning", pending: "Pending", info: "Info", fixing: "Fixing"};
   const age = healthAgeMin(), ago = age < 1 ? "just now" : age < 90 ? Math.round(age) + " min ago" : age < 48 * 60 ? Math.round(age / 60) + " h ago" : Math.round(age / 1440) + " days ago";
   const stale = healthStale(), c = HL.counts;
   const head = HL.overall === "fail" ? `${c.fail} problem${c.fail > 1 ? "s" : ""} need${c.fail > 1 ? "" : "s"} attention` : HL.overall === "warn" ? `All critical checks pass · ${c.warn} warning${c.warn > 1 ? "s" : ""}` : "All checks pass";
   const groups = [...new Set(HL.checks.map(x => x.group))];
-  const rank = {fail: 0, warn: 1, pending: 2, ok: 3, info: 4};
+  const rank = {fail: 0, fixing: 1, warn: 2, pending: 3, ok: 4, info: 5};
   el.innerHTML = `
   <div class="card hero" style="border-color:${HL.overall === "fail" ? "var(--dn)" : HL.overall === "warn" || stale ? "var(--warn)" : "var(--up)"}">
     <div class="lab">System health</div>
     <div class="big" style="font:700 clamp(24px,6vw,34px)/1.15 var(--f-display);margin:8px 0 6px;color:${HL.overall === "fail" ? "var(--dn)" : HL.overall === "ok" ? "var(--up)" : "var(--fg)"}">${head}</div>
     <div class="fg2" style="font-size:14px">Last checked <b style="color:var(--fg)">${esc(HL.generated_et)}</b> (${ago}). ${stale ? '<b class="dn">This check is out of date: the scheduled checks may have stopped. Open GitHub > Actions > Health check > Run workflow, and check cron-job.org.</b>' : ""}</div>
-    <div class="chips" style="margin-top:12px"><span class="pill up">${c.ok} OK</span>${c.warn ? `<span class="pill" style="background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)">${c.warn} warning</span>` : ""}${c.fail ? `<span class="pill dn">${c.fail} problem</span>` : ""}${c.pending ? `<span class="pill neutral">${c.pending} pending</span>` : ""}</div>
+    <div class="chips" style="margin-top:12px"><span class="pill up">${c.ok} OK</span>${c.warn ? `<span class="pill" style="background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)">${c.warn} warning</span>` : ""}${c.fail ? `<span class="pill dn">${c.fail} problem</span>` : ""}${c.fixing ? `<span class="pill e1">${c.fixing} fixing</span>` : ""}${c.pending ? `<span class="pill neutral">${c.pending} pending</span>` : ""}</div>
     <div class="hhist" title="Recent checks, newest first">${(HL.history || []).map(h => `<i title="${esc(h.t)}" style="background:${h.overall === "fail" ? "var(--dn)" : h.overall === "warn" ? "var(--warn)" : "var(--up)"}"></i>`).join("")}</div>
   </div>
   ${groups.map(g => `<div class="card"><div class="h2">${esc(g)}</div><div>${HL.checks.filter(x => x.group === g).sort((a, b) => rank[a.status] - rank[b.status]).map(x => `
     <div class="hrow"><span class="hst ${x.status}">${lab[x.status] || x.status}</span><div><b>${esc(x.name)}</b><div class="fg2" style="font-size:13.5px">${esc(x.detail)}</div>${x.fix ? `<div class="hfix">→ ${esc(x.fix)}</div>` : ""}</div></div>`).join("")}</div></div>`).join("")}
   <div class="card prose"><h3>How this works</h3><ul>
     <li>${esc(HL.schedule)}</li>
-    <li>When a check fails, a GitHub issue is opened, so the GitHub app notifies you. It closes itself when everything passes again.</li>
+    <li>Automatic fixes: a missing preview or daily run is started again (up to 3 times a day), disabled workflows are switched back on, and the page is republished if it falls behind. You are only notified (GitHub issue, so the GitHub app pushes it) when a fix doesn't work or a problem can't be fixed automatically, like the account ledger. The issue closes itself when everything passes again.</li>
+    ${(HL.remediation && HL.remediation.log || []).length ? `<li>Recent automatic fixes: ${HL.remediation.log.slice(0, 5).map(l => esc(new Date(l.t).toLocaleString("en-US", {timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}) + " ET: " + l.what + " (" + l.result + ")")).join("; ")}.</li>` : ""}
     <li>The key check runs about 10 minutes after the 3:15 PM ET preview, leaving time to fix a missing preview before Schwab's MOC cutoff.</li></ul></div>`;
 }
 
