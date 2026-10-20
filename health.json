@@ -1,6 +1,6 @@
 {
- "generated": "2026-10-19T20:34:20-04:00",
- "generated_et": "Mon Oct 19, 8:34 PM ET",
+ "generated": "2026-10-19T20:35:48-04:00",
+ "generated_et": "Mon Oct 19, 8:35 PM ET",
  "overall": "warn",
  "counts": {
   "fail": 0,
@@ -31,7 +31,7 @@
    "group": "Schedule",
    "name": "Recent workflow runs",
    "status": "ok",
-   "detail": "Latest run of each workflow succeeded (6 workflows).",
+   "detail": "Latest run of each workflow succeeded (5 workflows).",
    "fix": ""
   },
   {
@@ -155,6 +155,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-19T20:35:48-04:00",
+   "overall": "warn",
+   "fails": 0,
+   "warns": 3
+  },
   {
    "t": "2026-10-19T20:34:20-04:00",
    "overall": "warn",
