@@ -156,6 +156,7 @@ Everything runs on GitHub's servers. No PC has to be on.
 3b. **On-time trigger (cron-job.org):** create a fine-grained GitHub token (Settings → Developer settings → Fine-grained tokens) with access to **only this repo** and **Actions: Read and write**. At cron-job.org create two jobs, time zone **America/New_York**, Monday–Friday, method **POST**, headers `Accept: application/vnd.github+json`, `Authorization: Bearer <token>`, `X-GitHub-Api-Version: 2022-11-28`:
    - Preview — 12:15 and 15:15 → `https://api.github.com/repos/<user>/twin-engine/actions/workflows/preview.yml/dispatches`, body `{"ref":"main","inputs":{"window":"true"}}`
    - Daily run — 16:20 → `.../workflows/daily.yml/dispatches`, body `{"ref":"main"}`
+   - Health check — every 30 min, hours 9–17, minutes 25 and 55 → `.../workflows/health.yml/dispatches`, body `{"ref":"main"}`
    A successful call returns HTTP 204. The token expires (max 1 year): renew it and paste the new one into both jobs.
 4. **Validate:** Actions → **Validate engine** → Run workflow. It must end in PASS; the report is on the run page.
 5. **Open the account:** Actions → **Start account (once)** → Run workflow (defaults: start 2026-10-16, $20,000, $200/month, whole shares). The account opens at the real close of the start date.
@@ -262,6 +263,18 @@ Futures would get 60/40 tax treatment, but at $20k contracts are far too large t
 
 ---
 
+## 8a. Health checks
+
+`health.py` checks everything the system depends on and writes `health.json` for the dashboard's **Health** tab:
+schedule (daily run booked the last close, today's preview arrived, latest run of every workflow succeeded, cron-job.org started the jobs on time, workflows enabled),
+dashboard (live page published and current), data (Yahoo has every ticker's last close, no unexplained price jumps),
+account (no negative cash or shares, every holding priced, 9Sig bookkeeping matches the sleeve, engine split, Fed swap not stuck, every close booked, last preview matched the booked trades),
+configuration (versions, Fed dates left, market calendar coverage, cron-job.org token expiry) and upcoming reminders.
+
+It runs every 30 minutes on weekdays from 9:25 AM to 5:55 PM ET (cron-job.org), right after every preview and daily run, and hourly as a backup.
+The run about 10 minutes after the 3:15 PM ET preview leaves time to fix a missing preview before Schwab's MOC cutoff.
+A failure opens a GitHub issue (phone notification through the GitHub app); it closes itself when everything passes again. Warnings show only on the dashboard.
+
 ## 9. Dashboard guide
 
 | Tab | What it shows |
@@ -271,7 +284,8 @@ Futures would get 60/40 tax treatment, but at $20k contracts are far too large t
 | **Trades** | Full ledger: date, side, shares, price, $ value, reason, realized P&L, holding days, LONG/SHORT term |
 | **Signals** | 9Sig volatility switch gauge, TOM calendar, quarterly target progress, Fed-day swap status (next decision, buy/sell closes), LDS trend status per asset (price vs 210-day average), momentum overlay |
 | **Strategy** | The rules above and the parameters |
-| **Backtest** | v1.6 backtest from `backtest.json`: scenarios (2000, 2007, 2010 real ETFs, double costs, SPY), growth chart vs SPY, crash periods, five worst drawdowns, calendar years, 1987-style stress test, 25-year projection |
+| **Health** | Every automatic check with its status, details and how to fix it, and when it last ran (from `health.json`). The dot next to PAPER in the header is the same status on every tab: green OK, amber warning, red problem |
+| **Research** | v1.6 backtest from `backtest.json` (trading metrics too), plus the Idea Lab summary and a link to the full Idea Lab (`idealab.html`): scenarios (2000, 2007, 2010 real ETFs, double costs, SPY), growth chart vs SPY, crash periods, five worst drawdowns, calendar years, 1987-style stress test, 25-year projection |
 
 The dashboard reads `summary.json` from the same folder and shows only your paper account, from its start date onward. Before the first run it shows a "Not started" screen with the setup steps. No simulated or historical data is mixed into the account; backtest results live only on the Backtest tab.
 
