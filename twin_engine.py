@@ -464,6 +464,7 @@ def next_fomc(cal, date):
     return None, None
 
 # Important dates shown on the dashboard (Overview > Important dates). Add or edit lines here: (date, what, why/how).
+CRON_TOKEN_EXPIRES = "2027-10-19"   # GitHub token used by cron-job.org (health check warns 30 days ahead)
 REMINDERS = [
     ("2026-10-26", "Go live: buy the paper account's positions in the Roth as MOC orders", "Use the share counts on the Positions tab so later orders match the dashboard."),
     ("2026-10-27", "First live Fed-day swap: LDS sleeve into SOXL at the close", "Swap back at the close on Wed Oct 28."),
@@ -863,6 +864,9 @@ def main():
         pv = preview(a)
         if pv is None: return
         with open(PREVIEW_PATH, "w") as f: json.dump(pv, f, indent=1)
+        if pv.get("status") in ("orders", "no_orders"):           # dated copy: the health check compares it with the booked close
+            os.makedirs(os.path.join(HERE, "previews"), exist_ok=True)
+            with open(os.path.join(HERE, "previews", f"{pv['date']}.json"), "w") as f: json.dump(pv, f, indent=1)
         md = preview_markdown(pv); print(md)
         with open(os.path.join(HERE, "preview.md"), "w", encoding="utf-8") as f: f.write(md)
         if os.environ.get("GITHUB_OUTPUT"):

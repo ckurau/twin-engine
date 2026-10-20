@@ -1,0 +1,39 @@
+name: Health check
+# Checks everything the system depends on and writes health.json (dashboard Health tab).
+# Opens a GitHub issue (phone notification) when a check fails; closes it when all pass again.
+# Started every 30 minutes on weekdays by cron-job.org (New York time), right after each preview / daily run,
+# and hourly by GitHub's own (sometimes late) schedule as a backup.
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Preview orders (before the close)", "Daily run (after the close)"]
+    types: [completed]
+  schedule:
+    - cron: "40 13-23 * * 1-5"
+permissions:
+  contents: write
+  issues: write
+  actions: read
+concurrency:
+  group: twin-engine
+  cancel-in-progress: false
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Run checks
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python health.py | tee health.log; { echo '```'; cat health.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish health.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add health.json
+          git diff --cached --quiet || { git commit -m "Health check $(TZ=America/New_York date '+%F %H:%M')"; git pull --rebase; git push; }

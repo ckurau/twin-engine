@@ -41,7 +41,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add preview.json
+          git add preview.json previews/
           git diff --cached --quiet || { git commit -m "Preview ${{ steps.pv.outputs.date }}"; git pull --rebase; git push; }
       - name: Notify (GitHub issue -> phone notification)
         if: steps.pv.outputs.ran == '1' && steps.pv.outputs.orders != '0'
