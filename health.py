@@ -53,6 +53,7 @@ NOW = dt.datetime.fromisoformat(os.environ["HEALTH_NOW"]).astimezone(ET) if os.e
 TODAY = pd.Timestamp(NOW.date())
 IS_SESSION = CAL.is_session(TODAY)
 CLOSE = CAL.session_close(TODAY).tz_convert(ET).to_pydatetime() if IS_SESSION else None
+CUTOFF = CLOSE - dt.timedelta(minutes=te.MOC_CUTOFF_MIN) if IS_SESSION else None   # Schwab's MOC cutoff (3:45 PM ET)
 def prev_session(d): return pd.Timestamp(CAL.previous_session(d)).tz_localize(None) if CAL.is_session(d) else pd.Timestamp(CAL.date_to_session(d, direction="previous")).tz_localize(None)
 # the close the daily run should have booked by now (daily run starts 4:20 PM ET; allow until close + 50 min)
 if IS_SESSION and NOW >= CLOSE + dt.timedelta(minutes=50): EXPECTED_CLOSE = TODAY
@@ -87,11 +88,11 @@ def c_preview():
         add("Schedule", "Today's order preview", "ok", f"Arrived {preview.get('prices_as_of', '')}: " + (f"{n} MOC order(s) to place." if n else "no orders today."))
     elif NOW < due:
         add("Schedule", "Today's order preview", "pending", "Expected any minute now.")
-    elif NOW < CLOSE:
-        add("Schedule", "Today's order preview", "fail", "No preview yet and the close is near.",
+    elif NOW < CUTOFF:
+        add("Schedule", "Today's order preview", "fail", f"No preview yet; Schwab's MOC cutoff is {fmt_t(CUTOFF)}.",
             "GitHub app > twin-engine > Actions > 'Preview orders' > Run workflow (runs immediately). Place the orders as MOC before Schwab's cutoff.")
     else:
-        add("Schedule", "Today's order preview", "warn", "No preview was recorded today. The daily run still books the paper close.", "Check the 'Preview orders' runs in GitHub Actions.")
+        add("Schedule", "Today's order preview", "warn", "No preview before Schwab's MOC cutoff today. The daily run still books the paper close; when live, compare Schwab with the dashboard tomorrow.", "Check the 'Preview orders' runs in GitHub Actions.")
 
 RUNS = []
 def c_runs():
@@ -276,7 +277,7 @@ def fix(key, check_name, action, label):
         action(); rem["counts"][key] = tries + 1; rem["last"][key] = NOW.isoformat(timespec="seconds")
         rem["log"].insert(0, dict(t=NOW.isoformat(timespec="seconds"), what=label, result="started"))
         c["status"] = "fixing"; c["detail"] += f" Automatic fix: {label} (try {tries + 1} of {MAX_TRIES}). The health check runs again when it finishes."
-        if key == "preview" and NOW >= CLOSE - dt.timedelta(minutes=15): c["status"] = "fail"   # too close to the MOC cutoff: tell the owner too
+        if key == "preview" and NOW >= CUTOFF - dt.timedelta(minutes=15): c["status"] = "fail"   # within 15 min of Schwab's MOC cutoff: tell the owner too
     except Exception as e:
         rem["log"].insert(0, dict(t=NOW.isoformat(timespec="seconds"), what=label, result=f"could not start: {e}"))
         c["detail"] += f" Automatic fix could not start: {e}"
@@ -284,7 +285,7 @@ def fix(key, check_name, action, label):
 def remediate():
     if not TOKEN: return
     # preview missing close to the cutoff: start it now (the engine's window check stops it if it's too late)
-    if IS_SESSION and NOW < CLOSE - dt.timedelta(minutes=6) and not running("Preview"):
+    if IS_SESSION and NOW < CUTOFF - dt.timedelta(minutes=3) and not running("Preview"):
         fix("preview", "Today's order preview", lambda: api("actions/workflows/preview.yml/dispatches", "POST", {"ref": "main", "inputs": {"window": "true"}}),
             "started 'Preview orders'")
     # close not booked (late, failed or crashed run): start the daily run again - it only books closes that are final
@@ -303,6 +304,9 @@ def remediate():
     if c and (c["status"] == "fail" or lag_min >= 45):
         c["status"] = "fail"; fix("pages", "Dashboard is published and current", lambda: api("pages/builds", "POST"), "asked GitHub Pages to republish")
     # a failed preview/daily run whose problem is already gone needs nothing; other failed workflows are reported as they are
+    # within 15 minutes of Schwab's MOC cutoff a missing preview is always reported, even while a retry is pending
+    c = next((c for c in checks if c["name"] == "Today's order preview" and c["status"] == "fixing"), None)
+    if c and IS_SESSION and NOW >= CUTOFF - dt.timedelta(minutes=15): c["status"] = "fail"
 
 # ---------------------------------------------------------------------------- run
 for fn in (c_daily, c_preview, c_runs, c_trigger, c_workflows, c_pages, c_data, c_state, c_preview_vs_booked, c_config): safe(fn)

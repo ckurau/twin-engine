@@ -467,14 +467,14 @@ def next_fomc(cal, date):
 # Open to-do items shown on the dashboard (Overview > To do). Remove a line when it's done.
 TODO = [
     ("Tonight", "Fund the Roth", "About $14k there now; add the 2026 contribution (limit about $7,500) tonight so it settles before Mon Oct 26."),
-    ("Before go-live", "Ask Schwab for the market-on-close cutoff time", "Schwab chat is open 24/7. Until confirmed, enter orders by 12:40 PM PT."),
     ("Before go-live", "Dry run Tue-Fri: enter each preview's orders in thinkorswim without sending", "Tue Oct 20 at ~12:15 PM PT: the one-time v1.6 switch in LDS (sell TQQQ, buy UPRO)."),
     ("Decide", "Orders: fully automatic or one tap to approve?", "Fully automatic = orders placed ~12:15 PM PT with a pause switch. One tap = an Approve link; nothing trades if not tapped."),
     ("Decide", "Alerts: push app (ntfy / Pushover) or text message (Twilio)?", "Push is free or $5 one-time and supports Approve buttons; texts cost about $2/month and need ~2 weeks of carrier registration."),
     ("Decide", "Start the Schwab developer registration?", "developer.schwab.com: create an app and link the Roth. Approval takes days to weeks; needed for any automatic or one-tap ordering."),
 ]
 
-CRON_TOKEN_EXPIRES = "2027-10-19"   # GitHub token used by cron-job.org (health check warns 30 days ahead)
+CRON_TOKEN_EXPIRES = "2027-10-19"
+MOC_CUTOFF_MIN = 15   # thinkorswim accepts market-on-close orders until 15 min before the close (3:45 PM ET; 12:45 PM ET on early closes)   # GitHub token used by cron-job.org (health check warns 30 days ahead)
 REMINDERS = [
     ("2026-10-26", "Go live: buy the paper account's positions in the Roth as MOC orders", "Use the share counts on the Positions tab so later orders match the dashboard."),
     ("2026-10-27", "First live Fed-day swap: LDS sleeve into SOXL at the close", "Swap back at the close on Wed Oct 28."),
@@ -816,13 +816,16 @@ def preview(a):
     if not is_sess:
         out["status"] = "closed"; return out
     mins_left = (close_t - now_et).total_seconds() / 60
-    if a.window and not (5 <= mins_left <= 65):
+    if a.window and not (MOC_CUTOFF_MIN + 2 <= mins_left <= 65):   # after Schwab's MOC cutoff a preview is no use
         print(f"Outside the preview window ({mins_left:.0f} min to the {close_t:%H:%M} ET close) - skipping."); return None
     if a.window and os.path.exists(PREVIEW_PATH):             # two schedulers (cron-job.org + GitHub backup): one preview a day
         with open(PREVIEW_PATH) as f: old = json.load(f)
         if old.get("date") == str(today) and old.get("status") in ("orders", "no_orders"):
             print(f"Already previewed today at {old.get('prices_as_of')} - skipping."); return None
     out["close_time"] = close_t.strftime("%H:%M")
+    cut = close_t - dt.timedelta(minutes=MOC_CUTOFF_MIN); pt = cut - dt.timedelta(hours=3)
+    hm = lambda t: t.strftime("%I:%M %p").lstrip("0")
+    out["cutoff"] = f"{hm(cut)} ET ({hm(pt)} PT)"
     adj, close, divs, spl = fetch_yf()
     if close.index[-1].date() != today:                      # no row for today yet: build it from 1-minute bars
         last, ts = intraday_last(ALL_TICKERS)
@@ -863,7 +866,7 @@ def preview_markdown(pv):
         lines = [f"## Twin Engine: no orders today ({pv['date']})", "", "Nothing to place at the close."]
     else:
         lines = [f"## Twin Engine: {len(pv['orders'])} market-on-close order(s) for {pv['date']}", "",
-                 f"Place as **MOC** before the {pv.get('close_time', '16:00')} ET close (Schwab cutoff ~15 min earlier). Prices as of {pv.get('prices_as_of')}.", "",
+                 f"Place as **MOC** in thinkorswim **by {pv.get('cutoff', '3:45 PM ET (12:45 PM PT)')}** - Schwab's market-on-close cutoff. Prices as of {pv.get('prices_as_of')}.", "",
                  "| Side | Ticker | Shares | ~Price | ~Value |", "|---|---|---:|---:|---:|"]
         lines += [f"| {o['side']} | {o['ticker']} | {o['shares']:g} | ${o['est_price']:,.2f} | ${o['est_value']:,.0f} |" for o in pv["orders"]]
         lines += ["", "Why:"] + [f"- {o['ticker']}: " + "; ".join(o["reasons"]) for o in pv["orders"]]
@@ -875,7 +878,7 @@ def preview_markdown(pv):
 def main():
     ap = argparse.ArgumentParser(description="Twin Engine paper trader")
     ap.add_argument("cmd", choices=["run", "preview", "status", "reset", "replay", "validate"])
-    ap.add_argument("--window", action="store_true", help="preview: only run 5-65 min before today's close (for schedulers)")
+    ap.add_argument("--window", action="store_true", help="preview: only run from 65 min before the close until Schwab's MOC cutoff (for schedulers)")
     ap.add_argument("--years", type=float, default=3.0)
     ap.add_argument("--capital", type=float, default=P["start_capital"])
     ap.add_argument("--contrib", type=float, default=P["contrib_monthly"])

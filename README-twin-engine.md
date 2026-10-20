@@ -211,11 +211,11 @@ Two different things need testing, and only one of them needs live time:
 | **Strategy logic** (right trades, right sizes, no accounting errors) | `python twin_engine.py validate --years 3` replays the exact production code over the last 3 years of **real** prices and runs automatic checks (cash never negative, no negative shares, every held ETF priced, 50/50 at every year end, every Fed-day swap opens and closes, every trade has a reason). Writes `validation\validation_report.txt` and `validation\trades.csv`. Does not touch your paper account. | ~1 minute |
 | **Order execution** (orders reach Schwab, fill near the close, permissions) | Schwab's API has no paper-trading mode, so: run the order step in **dry-run** (prints the exact orders it would send) for ~2–3 weeks while checking them against thinkorswim, then go live with a small amount first | ~2–3 weeks |
 
-**Timing matters:** backtests show that placing orders one day late costs about 2.4 percentage points of CAGR and deepens the max drawdown by ~5 points. Orders must go in the **same day, before the close** (market-on-close, by 3:50 PM ET / 12:50 PM PT). That requires automation running on a computer or server, not manual orders from a phone the next morning.
+**Timing matters:** backtests show that placing orders one day late costs about 2.4 percentage points of CAGR and deepens the max drawdown by ~5 points. Orders must go in the **same day, before the close** (market-on-close, by Schwab's cutoff, 3:45 PM ET / 12:45 PM PT). That requires automation running on a computer or server, not manual orders from a phone the next morning.
 
 ### Production path
 1. Run **Validate engine** (Actions tab) with real data. Pass = all checks PASS and results in line with the backtest.
-2. Add the Schwab execution step (Schwab Trader API via the `schwab-py` library: computes targets ~12:40 PM PT from live prices, submits market-on-close orders, reconciles fills) and run it in dry-run mode for ~2–3 weeks.
+2. Add the Schwab execution step (Schwab Trader API via the `schwab-py` library: computes targets ~12:15 PM PT from live prices, submits market-on-close orders, reconciles fills) and run it in dry-run mode for ~2–3 weeks.
 3. Go live in the Roth IRA. Optionally start with part of the $20k and add the rest after the first quarter end.
 
 Where it runs: the order preview already runs on GitHub Actions (§3). Automatic order submission would need somewhere that can hold the Schwab login: GitHub Actions with the token stored as a secret, a small Linux VPS (~$10–20/mo), or QuantConnect cloud (supports Schwab live trading with market-on-close orders; ~$120/mo; IRA support not listed — confirm). Schwab's API needs a one-click browser re-login every 7 days (the refresh token expires). The dashboard stays on GitHub Pages for your phone.
@@ -273,6 +273,8 @@ configuration (versions, Fed dates left, market calendar coverage, cron-job.org 
 
 It runs every 30 minutes on weekdays from 9:25 AM to 5:55 PM ET (cron-job.org), right after every preview and daily run, and hourly as a backup.
 The run about 10 minutes after the 3:15 PM ET preview leaves time to fix a missing preview before Schwab's MOC cutoff.
+
+**Schwab's MOC cutoff: 3:45 PM ET (12:45 PM PT)**, 12:45 PM ET on 1:00 PM early-close days. thinkorswim removes MOC from the order-type menu after that (the exchanges accept MOC until 3:50 PM NYSE / 3:55 PM Nasdaq, but Schwab's deadline is the one that counts). The preview arrives ~12:15 PM PT, leaving 30 minutes; automatic re-tries stop at the cutoff, and you're notified if the preview is still missing at 12:30 PM PT.
 **Automatic fixes** (before anyone is notified): a missing preview is started again (8 minutes apart), a close that wasn't booked starts the daily run again (25 minutes apart), disabled workflows are re-enabled, and the page is republished if it lags for 45+ minutes. Each fix runs at most 3 times a day; the check shows **Fixing** meanwhile and re-runs as soon as the fixed job finishes.
 A GitHub issue (phone notification through the GitHub app) is opened only when a fix doesn't work, when a problem needs a person (the account ledger is never changed automatically), or when a preview is still missing 15 minutes before the close. It closes itself when everything passes again. Warnings show only on the dashboard.
 **Watching the watcher:** turn on "notify on failure" for the three cron-job.org jobs, so cron-job.org emails you if GitHub stops accepting its calls (for example an expired token).
@@ -307,7 +309,7 @@ Note: opening `index.html` directly from a file explorer can't read `summary.jso
 
 ```bat
 python twin_engine.py run [--capital 20000] [--contrib 200] [--whole-shares]
-python twin_engine.py preview [--window]     # orders from live prices; --window = only 5-65 min before the close
+python twin_engine.py preview [--window]     # orders from live prices; --window = only from 65 min before the close until the MOC cutoff
 python twin_engine.py status
 python twin_engine.py reset
 python twin_engine.py replay --csv prices.csv --start 2025-10-01 [--contrib 200] [--demo]

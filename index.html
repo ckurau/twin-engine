@@ -310,7 +310,7 @@ function previewCard(){
   return `<div class="card" style="border-color:var(--warn)">
     <div class="h2">Place before the close <span class="r"><span class="pill neutral">${PV.orders.length} MOC order${PV.orders.length > 1 ? "s" : ""}</span></span></div>
     <div class="list">${PV.orders.map(o => `<div class="li"><span class="side ${o.side}">${o.side}</span><div class="what"><b>${esc(o.ticker)}</b> <span class="num fg2">${o.shares.toLocaleString()} sh · ~${px(o.est_price)}</span><div class="muted" style="font-size:12.5px">${o.reasons.map(esc).join("; ")}</div></div><div class="num">~${money(o.est_value, 0)}</div></div>`).join("")}</div>
-    <div class="fg2" style="font-size:13px;margin-top:10px">Market-on-close, before Schwab's MOC cutoff for the ${close}. Prices as of ${esc(PV.prices_as_of || "")}; the daily run after the close books the actual fills.</div>${warn}
+    <div class="fg2" style="font-size:13px;margin-top:10px">Market-on-close in thinkorswim <b style="color:var(--fg)">by ${esc(PV.cutoff || "3:45 PM ET (12:45 PM PT)")}</b>, Schwab's cutoff for the ${close}; after that MOC is no longer offered. Prices as of ${esc(PV.prices_as_of || "")}; the daily run after the close books the actual fills.</div>${warn}
   </div>`;
 }
 
@@ -838,7 +838,7 @@ function renderHealth(){
     <li>${esc(HL.schedule)}</li>
     <li>Automatic fixes: a missing preview or daily run is started again (up to 3 times a day), disabled workflows are switched back on, and the page is republished if it falls behind. You are only notified (GitHub issue, so the GitHub app pushes it) when a fix doesn't work or a problem can't be fixed automatically, like the account ledger. The issue closes itself when everything passes again.</li>
     ${(HL.remediation && HL.remediation.log || []).length ? `<li>Recent automatic fixes: ${HL.remediation.log.slice(0, 5).map(l => esc(new Date(l.t).toLocaleString("en-US", {timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}) + " ET: " + l.what + " (" + l.result + ")")).join("; ")}.</li>` : ""}
-    <li>The key check runs about 10 minutes after the 3:15 PM ET preview, leaving time to fix a missing preview before Schwab's MOC cutoff.</li></ul></div>`;
+    <li>The key check runs about 10 minutes after the 3:15 PM ET preview, leaving time to fix a missing preview before Schwab's MOC cutoff (3:45 PM ET / 12:45 PM PT). If it's still missing 15 minutes before the cutoff, you are notified even while it retries.</li></ul></div>`;
 }
 
 /* ---------------- tabs ---------------- */
