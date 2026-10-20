@@ -1,13 +1,13 @@
 {
- "generated": "2026-10-19T20:27:53-04:00",
- "generated_et": "Mon Oct 19, 8:27 PM ET",
- "overall": "fail",
+ "generated": "2026-10-19T20:28:44-04:00",
+ "generated_et": "Mon Oct 19, 8:28 PM ET",
+ "overall": "warn",
  "counts": {
-  "fail": 1,
+  "fail": 0,
   "fixing": 0,
   "warn": 3,
   "pending": 0,
-  "ok": 13,
+  "ok": 14,
   "info": 3
  },
  "version": "1.6.0",
@@ -30,9 +30,9 @@
   {
    "group": "Schedule",
    "name": "Recent workflow runs",
-   "status": "fail",
-   "detail": "Last run failed: Health check (failure, Oct 19 08:26 PM)",
-   "fix": "Open the failed run in GitHub Actions to see the error, then re-run it. Ask Claude if it fails again."
+   "status": "ok",
+   "detail": "Latest run of each workflow succeeded (6 workflows).",
+   "fix": ""
   },
   {
    "group": "Schedule",
@@ -156,6 +156,12 @@
  ],
  "history": [
   {
+   "t": "2026-10-19T20:28:44-04:00",
+   "overall": "warn",
+   "fails": 0,
+   "warns": 3
+  },
+  {
    "t": "2026-10-19T20:27:53-04:00",
    "overall": "fail",
    "fails": 1,
@@ -198,5 +204,5 @@
   "log": []
  },
  "pages_lag_since": null,
- "fail_sig": "Recent workflow runsLast run failed: Health check (failure, "
+ "fail_sig": ""
 }
