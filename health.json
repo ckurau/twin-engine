@@ -1,11 +1,11 @@
 {
- "generated": "2026-10-20T11:25:22-04:00",
- "generated_et": "Tue Oct 20, 11:25 AM ET",
- "overall": "warn",
+ "generated": "2026-10-20T11:55:33-04:00",
+ "generated_et": "Tue Oct 20, 11:55 AM ET",
+ "overall": "fail",
  "counts": {
-  "fail": 0,
+  "fail": 1,
   "fixing": 0,
-  "warn": 2,
+  "warn": 1,
   "pending": 1,
   "ok": 14,
   "info": 4
@@ -30,9 +30,9 @@
   {
    "group": "Schedule",
    "name": "Recent workflow runs",
-   "status": "ok",
-   "detail": "Latest run of each workflow succeeded (4 workflows).",
-   "fix": ""
+   "status": "fail",
+   "detail": "Last run failed: Health check (failure, Oct 20 11:25 AM)",
+   "fix": "Open the failed run in GitHub Actions to see the error, then re-run it. Ask Claude if it fails again."
   },
   {
    "group": "Schedule",
@@ -58,9 +58,9 @@
   {
    "group": "Data",
    "name": "Price data (Yahoo Finance)",
-   "status": "warn",
-   "detail": "No Oct 19 close yet for: SSO.",
-   "fix": "Usually fixes itself within hours; if it persists into the next session, ask Claude."
+   "status": "ok",
+   "detail": "All 22 tickers have the Oct 19 close.",
+   "fix": ""
   },
   {
    "group": "Data",
@@ -163,6 +163,12 @@
  ],
  "history": [
   {
+   "t": "2026-10-20T11:55:33-04:00",
+   "overall": "fail",
+   "fails": 1,
+   "warns": 1
+  },
+  {
    "t": "2026-10-20T11:25:22-04:00",
    "overall": "warn",
    "fails": 0,
@@ -253,5 +259,5 @@
   "log": []
  },
  "pages_lag_since": null,
- "fail_sig": ""
+ "fail_sig": "Recent workflow runsLast run failed: Health check (failure, "
 }
