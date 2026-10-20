@@ -464,6 +464,16 @@ def next_fomc(cal, date):
     return None, None
 
 # Important dates shown on the dashboard (Overview > Important dates). Add or edit lines here: (date, what, why/how).
+# Open to-do items shown on the dashboard (Overview > To do). Remove a line when it's done.
+TODO = [
+    ("Setup", "Add the third cron-job.org job (Twin Engine health)", "Copy an existing job: URL .../workflows/health.yml/dispatches, Mon-Fri hours 9-17, minutes 25 and 55, body {\"ref\":\"main\"}. README 4 step 3b."),
+    ("Before go-live", "Fund the Roth", "About $14k there now; add the 2026 contribution (limit about $7,500) so it settles before Mon Oct 26."),
+    ("Before go-live", "Ask Schwab for the market-on-close cutoff time", "Until confirmed, enter orders by 12:40 PM PT."),
+    ("Decide", "Orders: fully automatic or one tap to approve?", "Fully automatic = orders placed ~12:15 PM PT with a pause switch. One tap = an Approve link; nothing trades if not tapped."),
+    ("Decide", "Alerts: push app (ntfy / Pushover) or text message (Twilio)?", "Push is free or $5 one-time and supports Approve buttons; texts cost about $2/month and need ~2 weeks of carrier registration."),
+    ("Decide", "Start the Schwab developer registration?", "developer.schwab.com: create an app and link the Roth. Approval takes days to weeks; needed for any automatic or one-tap ordering."),
+]
+
 CRON_TOKEN_EXPIRES = "2027-10-19"   # GitHub token used by cron-job.org (health check warns 30 days ahead)
 REMINDERS = [
     ("2026-10-26", "Go live: buy the paper account's positions in the Roth as MOC orders", "Use the share counts on the Positions tab so later orders match the dashboard."),
@@ -627,7 +637,7 @@ def build_summary(st, adj, close, cal, demo=False):
                      rebalance_day=str(cal.upcoming(date, cal.is_rebalance_day, 1)[0].date()),
                      assets=[dict(sym=a, **{k: (round(v, 4) if isinstance(v, float) else v) for k, v in diag.get(a, {}).items()}) for a in P["lds_assets"]])),
         positions=positions, trades=list(reversed(st["trades"]))[:1500], equity=st["equity"], events=list(reversed(st["events"]))[:150],
-        next_actions=actions, reminders=reminders(date), params={k: (list(v) if isinstance(v, tuple) else v) for k, v in P.items()},
+        next_actions=actions, reminders=reminders(date), todo=[dict(kind=k, what=w, note=n) for k, w, n in TODO], params={k: (list(v) if isinstance(v, tuple) else v) for k, v in P.items()},
     )
 
 def write_summary(sm, path=SUMMARY_PATH):
