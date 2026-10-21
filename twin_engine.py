@@ -497,6 +497,7 @@ REMINDERS = [
     ("2026-12-31", "First year-end 50/50 reset", "Also the 9Sig quarterly signal - expect several orders."),
     ("2027-04-15", "Last day for 2026 Roth IRA contributions", "2026 limit about $7,500; 2027 contributions open Jan 1."),
     ("2027-07-01", "Add the Fed's 2028 meeting dates to the engine", "The Fed publishes them each summer. Ask Claude, or edit FOMC_DATES in twin_engine.py."),
+    ("2027-06-15", "Update the market holiday calendar (exchange_calendars)", "The locked version covers trading days through Oct 2027. Ask Claude to update requirements.txt and re-run the checks."),
     ("2027-10-05", "Renew the GitHub token for cron-job.org (expires Oct 19, 2027)", "New fine-grained token, this repo only, Actions read/write; paste it into both cron-job.org jobs. README 4 step 3b."),
     ("2028-02-15", "Update the API version header in both cron-job.org jobs", "GitHub retires X-GitHub-Api-Version 2022-11-28 on Mar 10, 2028."),
 ]
