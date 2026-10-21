@@ -101,7 +101,12 @@ def c_runs():
     """Recent workflow runs succeeded"""
     global RUNS
     if not TOKEN: return add("Schedule", "Recent workflow runs", "info", "Not checked (runs only inside GitHub Actions).")
-    RUNS = api("actions/runs?per_page=60").get("workflow_runs", [])
+    # ask per workflow: with a health check and a page build every 30 minutes, an all-workflows list only reaches back ~12 hours
+    RUNS = []
+    for wf in ("preview.yml", "daily.yml", "start.yml", "validate.yml", "health.yml"):
+        try: RUNS += api(f"actions/workflows/{wf}/runs?per_page=30").get("workflow_runs", [])
+        except Exception: pass
+    RUNS.sort(key=lambda r: r["created_at"], reverse=True)
     latest = {}
     for r in RUNS:
         if r["status"] != "completed" or r["name"] in latest: continue
@@ -243,6 +248,54 @@ def c_preview_vs_booked():
     else: add("Account", "Preview matched the booked close", "warn", f"{day}: " + "; ".join(f"{t} preview {a:+g}, booked {b:+g}" for t, a, b in diffs),
               "Prices moved after the preview. When live, compare your fills with the dashboard and adjust at the next order day.")
 
+# ---------------------------------------------------------------------------- 3b. guardrails (pre-set rules)
+def c_guardrails():
+    """Pre-set rules"""
+    G = te.GUARDRAILS
+    eq = pd.Series([e["value"] for e in state["equity"]], index=pd.to_datetime([e["date"] for e in state["equity"]]))
+    spy = pd.Series([e["spy"] for e in state["equity"]], index=eq.index)
+    dd = float(eq.iloc[-1] / eq.max() - 1)
+    if dd > G["dd_expected"]: add("Guardrails", "Drawdown", "ok", f"{dd:.1%} from the high. Drops to {G['dd_expected']:.0%} are normal for this strategy.")
+    elif dd > G["dd_review"]: add("Guardrails", "Drawdown", "info", f"{dd:.1%} from the high: painful but inside the expected range. Pre-set rule: keep following the orders.")
+    elif dd > G["dd_pause"]: add("Guardrails", "Drawdown", "warn", f"{dd:.1%} from the high, deeper than the backtest ever went.", "Pre-set rule: review with Claude (data, ETF or rule problem?). Keep following the orders meanwhile.")
+    else: add("Guardrails", "Drawdown", "fail", f"{dd:.1%} from the high.", "Pre-set rule: pause new contributions and review whether to continue. Positions keep following the rules until you decide.")
+    days = (eq.index[-1] - eq.index[0]).days
+    if days >= 365:
+        r12 = float(eq.iloc[-1] / eq.loc[:eq.index[-1] - pd.Timedelta(days=365)].iloc[-1] - 1)
+        add("Guardrails", "Last 12 months", "warn" if r12 < G["trail_12m"] else "ok", f"{r12:+.1%} (backtest's worst 5% of 12-month periods: {G['trail_12m']:.1%}).",
+            "Pre-set rule: review with Claude; a bad year alone is not a reason to quit." if r12 < G["trail_12m"] else "")
+    else:
+        add("Guardrails", "Last 12 months", "info", f"Checked after 12 months live (now {days} days, {eq.iloc[-1] / eq.iloc[0] - 1:+.1%} since the start).")
+    if days >= 3 * 365:
+        yrs = days / 365.25; c = (eq.iloc[-1] / eq.iloc[0]) ** (1 / yrs) - 1; cs = (spy.iloc[-1] / spy.iloc[0]) ** (1 / yrs) - 1
+        bad = c < cs - G["lag_spy_3y"] or c < G["min_3y_cagr"]
+        add("Guardrails", "3-year check vs SPY", "warn" if bad else "ok", f"{c:.1%} a year vs SPY {cs:.1%}.",
+            "Pre-set rule: the edge may be gone - consider moving to a plain index fund. Decide calmly, not after a single bad month." if bad else "")
+    else:
+        add("Guardrails", "3-year check vs SPY", "info", "Checked after 3 years live: switch to an index fund if CAGR trails SPY by 10+ points or is under 5% a year.")
+    off = state.get("real_offset") or {}
+    if str(TODAY.date()) < te.GO_LIVE_DATE:
+        add("Guardrails", "Real account follows the orders", "info", f"Starts at go-live ({te.GO_LIVE_DATE}).")
+    elif off:
+        add("Guardrails", "Real account follows the orders", "warn", "A close differed from its preview: " + ", ".join(f"{k} {-v:+g}" for k, v in off.items()) + ". The next order preview includes the correction.",
+            "Place the correction orders with the next preview. If you skipped a preview, ask Claude to reset the corrections.")
+    else:
+        add("Guardrails", "Real account follows the orders", "ok", "Every close matched its preview, so no corrections are pending.")
+
+def c_etfs():
+    """Every ETF still trades"""
+    q = te.backup_quotes(te.ALL_TICKERS)
+    if len(q) < len(te.ALL_TICKERS) // 2: return add("Data", "Every ETF still trades", "info", "Live quote service not reachable; checked next time.")
+    last = str(EXPECTED_CLOSE.date())
+    stale = [t for t in te.ALL_TICKERS if t not in q or q[t][1] < last]
+    held = {t for h in state.get("sleeves", {}).values() for t in h["holdings"]}
+    if stale:
+        add("Data", "Every ETF still trades", "fail" if set(stale) & held else "warn",
+            "No trade on the last session for: " + ", ".join(f"{t} (replacement: {te.SUBSTITUTES.get(t, 'ask Claude')})" for t in stale) + ".",
+            "Check the issuer's site for a closure notice. Ask Claude to switch the ETF; nothing is switched automatically.")
+    else:
+        add("Data", "Every ETF still trades", "ok", f"All {len(te.ALL_TICKERS)} ETFs traded on the {EXPECTED_CLOSE:%b %d} session.")
+
 # ---------------------------------------------------------------------------- 4. configuration
 def c_config():
     """Versions, calendars, token"""
@@ -320,7 +373,7 @@ def remediate():
     if c and IS_SESSION and NOW >= CUTOFF - dt.timedelta(minutes=15): c["status"] = "fail"
 
 # ---------------------------------------------------------------------------- run
-for fn in (c_daily, c_preview, c_runs, c_trigger, c_workflows, c_pages, c_data, c_state, c_preview_vs_booked, c_config): safe(fn)
+for fn in (c_daily, c_preview, c_runs, c_trigger, c_workflows, c_pages, c_data, c_etfs, c_state, c_preview_vs_booked, c_guardrails, c_config): safe(fn)
 try: remediate()
 except Exception as e: add("Health check", "Automatic fixes", "warn", f"Automatic fixes crashed: {e}")
 order = {"fail": 0, "fixing": 1, "warn": 2, "pending": 3, "ok": 4, "info": 5}

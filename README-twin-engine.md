@@ -255,6 +255,23 @@ Broker setup at Schwab: register an app at developer.schwab.com ("Accounts and T
 
 ---
 
+### 7a. Pre-set rules (decided now, checked automatically on the Health tab > Guardrails)
+
+| Situation | Pre-set response |
+|---|---|
+| Down up to 40% from the high | Normal for this strategy. Keep following the orders. |
+| Down 40–55% | Painful but inside the expected range. Keep following the orders. |
+| Down 55–65% (deeper than the backtest ever went) | Review with Claude: is a data feed, ETF or rule broken? Keep following the orders meanwhile. |
+| Down more than 65% | Pause new contributions and decide calmly whether to continue. Positions keep following the rules until you decide. |
+| Last 12 months below −11.4% (the backtest's worst 5%) | Review; a bad year alone is not a reason to quit. |
+| After 3+ years: CAGR more than 10 pts below SPY, or under 5% a year | The edge may be gone: consider moving to a plain index fund. |
+| An ETF stops trading (closure) | The Health tab names the replacement (`SUBSTITUTES` in `twin_engine.py`); ask Claude to switch. Nothing switches automatically. |
+| Real account differs from the paper account | Automatic: from go-live (`GO_LIVE_DATE`), any preview-vs-close difference is added to the next preview as a correction order. |
+
+Never change these rules during a drawdown. They live in `GUARDRAILS` in `twin_engine.py`.
+
+**Borderline days:** when a decision is close to its trigger at 3:15 PM ET (dip-boost RSI near 20, volatility switch near its band, LDS change near 5%), the order card says so. The close may decide differently; the next preview corrects it.
+
 ## 8. Taxes (why Roth)
 
 Simulated FIFO tax lots (2000–2026): dollar-weighted holding period of sold shares ≈ **64 days**; ~1% of sale proceeds came from lots held > 1 year; **~85–90% of realized gains are short-term**. In a taxable account that means ordinary-income rates plus frequent wash sales. In a Roth/IRA none of this matters. The dashboard still tags each sale LONG/SHORT so you can see it.

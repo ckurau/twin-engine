@@ -431,6 +431,7 @@ def step(st, date, adj: pd.DataFrame, close: dict, cal: Calendar, divs: dict | N
         tg = {t: c * vl for t, c in caps.items()}
         cur = {t: sh * close[t] for t, sh in st["sleeves"]["LDS"]["holdings"].items()}
         turn = sum(abs(tg.get(t, 0) - cur.get(t, 0)) for t in set(tg) | set(cur))
+        lds["last_turnover"] = turn / vl if vl else 0.0
         if turn > P["lds_threshold"] * vl or lds_force or rule_change:
             set_targets(st, "LDS", tg, close, date, "Initial allocation" if lds_force else ("LDS rebalance: v1.6 rule change (no QQQ)" if rule_change else "LDS monthly rebalance"))
             lds["exposures"] = ex; lds["last_rebalance"] = str(date.date()); ev.append(f"LDS rebalanced (turnover {turn / vl:.0%})")
@@ -466,15 +467,29 @@ def next_fomc(cal, date):
 # Important dates shown on the dashboard (Overview > Important dates). Add or edit lines here: (date, what, why/how).
 # Open to-do items shown on the dashboard (Overview > To do). Remove a line when it's done.
 TODO = [
-    ("Tonight", "Fund the Roth", "About $14k there now; add the 2026 contribution (limit about $7,500) tonight so it settles before Mon Oct 26."),
+    ("Before go-live", "Fund the Roth", "About $14k there now; add the 2026 contribution (limit about $7,500) so it settles before Mon Oct 26."),
     ("Before go-live", "Dry run Tue-Fri: enter each preview's orders in thinkorswim without sending", "Tue Oct 20 at ~12:15 PM PT: the one-time v1.6 switch in LDS (sell TQQQ, buy UPRO)."),
     ("Decide", "Orders: fully automatic or one tap to approve?", "Fully automatic = orders placed ~12:15 PM PT with a pause switch. One tap = an Approve link; nothing trades if not tapped."),
     ("Decide", "Alerts: push app (ntfy / Pushover) or text message (Twilio)?", "Push is free or $5 one-time and supports Approve buttons; texts cost about $2/month and need ~2 weeks of carrier registration."),
     ("Decide", "Start the Schwab developer registration?", "developer.schwab.com: create an app and link the Roth. Approval takes days to weeks; needed for any automatic or one-tap ordering."),
 ]
 
-CRON_TOKEN_EXPIRES = "2027-10-19"
-MOC_CUTOFF_MIN = 15   # thinkorswim accepts market-on-close orders until 15 min before the close (3:45 PM ET; 12:45 PM ET on early closes)   # GitHub token used by cron-job.org (health check warns 30 days ahead)
+CRON_TOKEN_EXPIRES = "2027-10-19"   # GitHub token used by cron-job.org (health check warns 30 days ahead)
+GO_LIVE_DATE = "2026-10-26"   # from this close on, the real account follows the previews; any preview-vs-close difference is corrected next time
+# Pre-set rules, decided in advance and checked automatically by the health check (Health tab > Guardrails). Never change them during a drawdown.
+GUARDRAILS = dict(
+    dd_expected=-0.40,      # drawdowns to here are normal for this strategy: keep following the rules
+    dd_review=-0.55,        # deeper than the backtest ever went: review with Claude (data/feed/ETF problems?), keep the rules
+    dd_pause=-0.65,         # pause new money and review whether to continue; existing positions keep following the rules
+    trail_12m=-0.114,       # 12-month return below the backtest's worst 5% (-11.4%): review
+    lag_spy_3y=0.10,        # after 3+ years live: CAGR more than 10 pts below SPY's -> consider moving to a plain index fund
+    min_3y_cagr=0.05,       # after 3+ years live: CAGR below 5% a year (backtest worst 5% was 13.1%) -> strategy may have stopped working
+)
+# If an ETF closes or stops trading, the health check names its replacement (closest exposure, no automatic switch)
+SUBSTITUTES = {"TQQQ": "QLD (2x Nasdaq; hold 1.5x the dollars)", "UPRO": "SPXL (3x S&P 500, Direxion)", "SPXU": "SPXS (-3x S&P 500, Direxion)",
+               "TMF": "UBT (2x long Treasuries)", "TMV": "TBT (-2x long Treasuries)", "UGL": "GLD (1x gold)", "GLL": "none - drop the gold short",
+               "SOXL": "TQQQ for the Fed-day swap", "TLT": "VGLT / SPTL (long Treasuries)", "GLD": "IAU / GLDM (gold)", "SPY": "VOO / IVV", "QQQ": "QQQM"}
+MOC_CUTOFF_MIN = 15   # thinkorswim accepts market-on-close orders until 15 min before the close (3:45 PM ET; 12:45 PM ET on early closes)
 REMINDERS = [
     ("2026-10-26", "Go live: buy the paper account's positions in the Roth as MOC orders", "Use the share counts on the Positions tab so later orders match the dashboard."),
     ("2026-10-27", "First live Fed-day swap: LDS sleeve into SOXL at the close", "Swap back at the close on Wed Oct 28."),
@@ -613,7 +628,8 @@ def build_summary(st, adj, close, cal, demo=False):
     return dict(
         meta=dict(version=VERSION, generated=dt.datetime.now().isoformat(timespec="seconds"), as_of=st["last_date"],
                   start_date=st["start_date"], start_capital=st["start_capital"], demo=demo, mode="paper",
-                  contrib_monthly=st["contrib_monthly"], warnings=[w for w in [warn] if w], data_notes=list(DATA_NOTES)),
+                  contrib_monthly=st["contrib_monthly"], warnings=[w for w in [warn] if w], data_notes=list(DATA_NOTES),
+                  real_offset=st.get("real_offset") or {}, go_live=GO_LIVE_DATE),
         portfolio=dict(value=round(tot, 2), day_pl=round(tot - prev - (eq.contributed.iloc[-1] - (eq.contributed.iloc[-2] if len(eq) > 1 else eq.contributed.iloc[-1])), 2),
                        day_pct=round((tot / prev - 1) * 100, 2), contributed=round(st["contributed"], 2),
                        total_pl=round(tot - st["contributed"], 2), total_pct=round((tot / st["contributed"] - 1) * 100, 2),
@@ -965,7 +981,7 @@ def preview(a):
     st["fractional"] = P["fractional"]
     dates = [close.index[-1]] if st["last_date"] is None else [d for d in close.index if d > pd.Timestamp(st["last_date"])]
     n0 = len(st["trades"]); e0 = len(st["events"])
-    run_days(st, adj, close, dates, divs, spl, quiet=True)
+    cal = run_days(st, adj, close, dates, divs, spl, quiet=True)
     tday = str(today)
     out["trades"] = [t for t in st["trades"][n0:] if t["date"] == tday]
     out["events"] = [e["text"] for e in st["events"][e0:] if e["date"] == tday]
@@ -973,6 +989,22 @@ def preview(a):
     for t in out["trades"]:
         s = t["shares"] if t["side"] == "BUY" else -t["shares"]
         n = net[t["ticker"]]; n[0] += s; n[1] = t["price"]; n[2].append(f"{t['sleeve']}: {t['reason']}")
+    # self-correcting: if an earlier close booked different shares than its preview (prices moved in the last 45 min),
+    # the real account (which followed the preview) differs from the paper account by real_offset - fix it now
+    if tday >= GO_LIVE_DATE:
+        for tk, off in (st.get("real_offset") or {}).items():
+            if abs(off) >= 1e-6:
+                n = net[tk]; n[0] -= off; n[1] = n[1] or float(close.at[pd.Timestamp(today), tk]); n[2].append(f"Correction: {-off:+g} shares to match the paper account (an earlier close differed from its preview)")
+        out["corrections"] = {k: -v for k, v in (st.get("real_offset") or {}).items() if abs(v) >= 1e-6}
+    # borderline decisions: prices in the last 45 minutes could flip them (the next preview corrects any difference)
+    nine, lds = st["nine"], st["lds"]; bl = []
+    if nine.get("qqq_up") and nine.get("rsi2") is not None and P["dip_rsi2"] is not None and abs(nine["rsi2"] - P["dip_rsi2"]) < 4:
+        bl.append(f"Dip boost: QQQ 2-day RSI is {nine['rsi2']:.0f}, near the {P['dip_rsi2']:.0f} trigger")
+    if nine.get("raw") is not None and nine["w_base"] < 0.999 and abs(abs(nine["raw"] - nine["w_base"]) - P["vol_band"]) < 0.015:
+        bl.append(f"Volatility switch: new size {nine['raw']:.0%} vs current {nine['w_base']:.0%} is near the {P['vol_band']:.0%} change band")
+    if cal.is_lds_review(pd.Timestamp(today)) and abs(lds.get("last_turnover", 0) - P["lds_threshold"]) < 0.01:
+        bl.append(f"LDS review: change of {lds['last_turnover']:.1%} is near the {P['lds_threshold']:.0%} trade threshold")
+    out["borderline"] = bl
     for tk, (sh, p_, why) in sorted(net.items(), key=lambda x: x[1][0]):   # sells first
         if abs(sh) < 1e-6: continue
         out["orders"].append(dict(ticker=tk, side="BUY" if sh > 0 else "SELL", shares=round(abs(sh), 4), est_price=round(p_, 2),
@@ -992,6 +1024,7 @@ def preview_markdown(pv):
                  "| Side | Ticker | Shares | ~Price | ~Value |", "|---|---|---:|---:|---:|"]
         lines += [f"| {o['side']} | {o['ticker']} | {o['shares']:g} | ${o['est_price']:,.2f} | ${o['est_value']:,.0f} |" for o in pv["orders"]]
         lines += ["", "Why:"] + [f"- {o['ticker']}: " + "; ".join(o["reasons"]) for o in pv["orders"]]
+    if pv.get("borderline"): lines += ["", "**Borderline today** (the close could differ; any difference is corrected in the next preview): " + "; ".join(pv["borderline"]) + "."]
     lines += [f"- {e}" for e in pv["events"] if not pv["orders"]]
     lines += ["", *[f"> {w}" for w in pv["warnings"]]]
     lines += ["", "_Estimate from prices ~30 min before the close. The daily run after the close books the actual paper fills._"]
@@ -1058,7 +1091,19 @@ def main():
     if a.cmd == "run":
         if not dates: print("Already up to date.");
         close = sanity_check(close, dates, st, spl)
+        n0 = len(st["trades"])
         cal = run_days(st, adj, close, dates, divs, spl)
+        for d in dates:                      # what the real account did (the preview) minus what the paper account booked
+            ds = str(d.date()); f = os.path.join(HERE, "previews", f"{ds}.json")
+            if ds < GO_LIVE_DATE or not os.path.exists(f): continue
+            with open(f) as fh: pv = json.load(fh)
+            if pv.get("status") not in ("orders", "no_orders"): continue
+            off = st.setdefault("real_offset", {})
+            for o in pv["orders"]: off[o["ticker"]] = off.get(o["ticker"], 0) + (o["shares"] if o["side"] == "BUY" else -o["shares"])
+            for t in st["trades"][n0:]:
+                if t["date"] == ds: off[t["ticker"]] = off.get(t["ticker"], 0) - (t["shares"] if t["side"] == "BUY" else -t["shares"])
+            st["real_offset"] = {k: round(v, 4) for k, v in off.items() if abs(v) >= 1e-6}
+            if st["real_offset"]: print(f"{ds}: the close differed from the preview; next preview corrects {st['real_offset']}")
         save_state(st)
         ld = pd.Timestamp(st["last_date"])     # Yahoo sometimes drops a recent day it already published: use the latest prices it still has
         cff = close.ffill(limit=5); cff = cff.reindex(cff.index.union([ld])).ffill()
