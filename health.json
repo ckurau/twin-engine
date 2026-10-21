@@ -1,13 +1,13 @@
 {
- "generated": "2026-10-20T20:56:29-04:00",
- "generated_et": "Tue Oct 20, 8:56 PM ET",
- "overall": "warn",
+ "generated": "2026-10-21T00:12:38-04:00",
+ "generated_et": "Wed Oct 21, 12:12 AM ET",
+ "overall": "ok",
  "counts": {
   "fail": 0,
   "fixing": 0,
-  "warn": 1,
-  "pending": 0,
-  "ok": 17,
+  "warn": 0,
+  "pending": 1,
+  "ok": 18,
   "info": 3
  },
  "version": "1.6.0",
@@ -23,8 +23,8 @@
   {
    "group": "Schedule",
    "name": "Today's order preview",
-   "status": "ok",
-   "detail": "Arrived 15:15 ET: 3 MOC order(s) to place.",
+   "status": "pending",
+   "detail": "Due at about Wed Oct 21, 3:15 PM ET.",
    "fix": ""
   },
   {
@@ -38,7 +38,7 @@
    "group": "Schedule",
    "name": "On-time trigger (cron-job.org)",
    "status": "ok",
-   "detail": "Preview started 3:15 PM ET today; daily run started Tue 04:20 PM ET.",
+   "detail": "Daily run started Tue 04:20 PM ET.",
    "fix": ""
   },
   {
@@ -58,9 +58,16 @@
   {
    "group": "Data",
    "name": "Price data (Yahoo Finance)",
-   "status": "warn",
-   "detail": "Yahoo doesn't have the Oct 20 close yet (latest Oct 19, 5 h after that close).",
-   "fix": "Usually Yahoo catches up within hours. If this is still failing by the next morning, ask Claude."
+   "status": "ok",
+   "detail": "All 22 tickers have the Oct 20 close.",
+   "fix": ""
+  },
+  {
+   "group": "Data",
+   "name": "Backup price sources (CNBC, Nasdaq)",
+   "status": "ok",
+   "detail": "Live quotes reachable; daily closes reachable.",
+   "fix": ""
   },
   {
    "group": "Data",
@@ -136,7 +143,7 @@
    "group": "Configuration",
    "name": "cron-job.org GitHub token",
    "status": "ok",
-   "detail": "Expires Oct 19, 2027 (364 days).",
+   "detail": "Expires Oct 19, 2027 (363 days).",
    "fix": ""
   },
   {
@@ -162,6 +169,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-21T00:12:38-04:00",
+   "overall": "ok",
+   "fails": 0,
+   "warns": 0
+  },
   {
    "t": "2026-10-20T20:56:29-04:00",
    "overall": "warn",
@@ -410,7 +423,7 @@
   }
  ],
  "remediation": {
-  "date": "2026-10-20",
+  "date": "2026-10-21",
   "counts": {},
   "log": []
  },
