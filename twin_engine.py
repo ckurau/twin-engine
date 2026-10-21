@@ -613,7 +613,7 @@ def build_summary(st, adj, close, cal, demo=False):
     return dict(
         meta=dict(version=VERSION, generated=dt.datetime.now().isoformat(timespec="seconds"), as_of=st["last_date"],
                   start_date=st["start_date"], start_capital=st["start_capital"], demo=demo, mode="paper",
-                  contrib_monthly=st["contrib_monthly"], warnings=[w for w in [warn] if w]),
+                  contrib_monthly=st["contrib_monthly"], warnings=[w for w in [warn] if w], data_notes=list(DATA_NOTES)),
         portfolio=dict(value=round(tot, 2), day_pl=round(tot - prev - (eq.contributed.iloc[-1] - (eq.contributed.iloc[-2] if len(eq) > 1 else eq.contributed.iloc[-1])), 2),
                        day_pct=round((tot / prev - 1) * 100, 2), contributed=round(st["contributed"], 2),
                        total_pl=round(tot - st["contributed"], 2), total_pct=round((tot / st["contributed"] - 1) * 100, 2),
@@ -669,19 +669,96 @@ def unadjust_splits(close, divs, spl):
     rdiv = divs.reindex(index=close.index, columns=close.columns).fillna(0.0) * later if divs is not None else None
     return raw, rdiv
 
+DATA_NOTES = []          # what the data layer had to work around this run (shown by the health check / preview)
+_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
+       "Accept": "application/json"}
+
+def _get_json(url, timeout=20):
+    import urllib.request
+    with urllib.request.urlopen(urllib.request.Request(url, headers=_UA), timeout=timeout) as r: return json.load(r)
+
+def _num(x):
+    try: return float(str(x).replace("$", "").replace(",", ""))
+    except Exception: return float("nan")
+
+def backup_history(tickers, start):
+    """daily closes (not dividend-adjusted) from Nasdaq's public quote service - backup when Yahoo fails"""
+    out = {}
+    for t in tickers:
+        for k in range(2):
+            try:
+                j = _get_json(f"https://api.nasdaq.com/api/quote/{t}/historical?assetclass=etf&fromdate={pd.Timestamp(start).date()}"
+                              f"&todate={dt.date.today()}&limit=9999")
+                rows = ((j.get("data") or {}).get("tradesTable") or {}).get("rows") or []
+                s = pd.Series({pd.Timestamp(r["date"]): _num(r["close"]) for r in rows}).sort_index()
+                if len(s): out[t] = s; break
+            except Exception: pass
+    return pd.DataFrame(out).sort_index()
+
+def backup_quotes(tickers):
+    """live quotes from CNBC's quote service: {ticker: (price, trade date, market status)} - backup / cross-check for the preview"""
+    q = {}
+    for i in range(0, len(tickers), 12):
+        chunk = "%7C".join(tickers[i:i + 12])
+        try:
+            j = _get_json(f"https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols={chunk}"
+                          "&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json")
+            for r in j["FormattedQuoteResult"]["FormattedQuote"]:
+                if str(r.get("code")) == "0": q[r["symbol"]] = (_num(r.get("last")), str(r.get("last_time", ""))[:10], r.get("curmktstatus", ""))
+        except Exception: pass
+    return q
+
 def fetch_yf(years=3, tries=4):
     import time, yfinance as yf
-    for i in range(tries):           # Yahoo sometimes throttles cloud runners: retry, then stop with a clear error
-        d = yf.download(ALL_TICKERS, period=f"{years}y", auto_adjust=False, actions=True, progress=False, group_by="column")
+    d = None
+    for i in range(tries):           # Yahoo sometimes throttles cloud runners: retry, then fall back to the backup source
+        try: d = yf.download(ALL_TICKERS, period=f"{years}y", auto_adjust=False, actions=True, progress=False, group_by="column")
+        except Exception as e: print("Yahoo download error:", e); d = None
         if d is not None and len(d) and all(t in d["Close"] and d["Close"][t].notna().any() for t in SIGNAL_TICKERS): break
-        if i == tries - 1: raise RuntimeError("Price download from Yahoo failed (empty or missing tickers) - nothing was changed. Try again later.")
-        time.sleep(30 * (i + 1))
+        d = None
+        if i < tries - 1: time.sleep(30 * (i + 1))
+    if d is None:
+        hist = backup_history(ALL_TICKERS, pd.Timestamp.today() - pd.DateOffset(years=years))
+        if hist.empty or any(t not in hist for t in SIGNAL_TICKERS):
+            raise RuntimeError("Price download failed from Yahoo and from the Nasdaq backup - nothing was changed. Try again later.")
+        DATA_NOTES.append("Yahoo was unavailable: all prices came from the Nasdaq backup (closes not dividend-adjusted).")
+        print(DATA_NOTES[-1]); hist = hist.ffill(limit=5)
+        return hist.copy(), hist.copy(), None, None
     d = _refetch_gaps(d, years)
     adj, close = _naive(d["Adj Close"]), _naive(d["Close"])
     divs = _naive(d["Dividends"]) if "Dividends" in d else None; spl = _naive(d["Stock Splits"]) if "Stock Splits" in d else None
     adj, close = adj.dropna(how="all"), close.dropna(how="all")
     close, divs = unadjust_splits(close, divs, spl)
+    adj, close = _fill_recent_from_backup(adj, close)
     return adj, close, divs, spl
+
+def _fill_recent_from_backup(adj, close):
+    """Yahoo sometimes leaves a recent close blank or drops a whole day. Fill closes of the last 7 finished sessions from Nasdaq."""
+    try:
+        from zoneinfo import ZoneInfo
+        now = dt.datetime.now(ZoneInfo("America/New_York")); today = pd.Timestamp(now.date())
+        sess = [d for d in nyse_sessions(today - pd.Timedelta(days=10), today) if d < today or (now.hour, now.minute) >= (16, 15)]
+        need = {}
+        for d in sess[-7:]:
+            row = close.loc[d] if d in close.index else None
+            miss = [t for t in ALL_TICKERS if row is None or t not in row or not (row[t] > 0)]
+            if miss: need[d] = miss
+        if not need: return adj, close
+        b = backup_history(sorted({t for m in need.values() for t in m}), min(need) - pd.Timedelta(days=7))
+        filled = []
+        for d, miss in need.items():
+            for t in miss:
+                if t in b and d in b.index and b.at[d, t] > 0:
+                    if d not in close.index: close.loc[d] = np.nan; adj.loc[d] = np.nan; close.sort_index(inplace=True); adj.sort_index(inplace=True)
+                    prev = close[t].loc[:d].iloc[:-1].dropna()
+                    ratio = float(adj[t].loc[prev.index[-1]] / prev.iloc[-1]) if len(prev) and prev.iloc[-1] > 0 else 1.0
+                    close.at[d, t] = b.at[d, t]; adj.at[d, t] = b.at[d, t] * ratio; filled.append(f"{t} {d:%b %d}")
+        if filled:
+            DATA_NOTES.append("Filled from the Nasdaq backup (Yahoo was missing them): " + ", ".join(filled[:12]) + (" ..." if len(filled) > 12 else ""))
+            print(DATA_NOTES[-1])
+    except Exception as e:
+        print("Backup fill skipped:", e)
+    return adj, close
 
 def _refetch_gaps(d, years):
     """yfinance's multi-ticker download sometimes drops a ticker (e.g. 'database is locked' in its cache).
@@ -714,6 +791,29 @@ def day_prices(close_ff, d, st):
     missing = sorted(t for t in need if t not in c or not (c[t] > 0))
     if missing: raise RuntimeError(f"{d.date()}: no valid price for {', '.join(missing)} - data problem, run stopped (state not saved)")
     return c.to_dict()
+
+def sanity_check(close, dates, st, spl=None):
+    """Before booking: a held ETF moving more than 45% in a day without a split is probably a bad price. Check it against
+    the Nasdaq backup; use the backup if it disagrees; stop (nothing saved) if it can't be confirmed."""
+    prev = dict(st.get("prev_close") or {})
+    held = {t for h in st["sleeves"].values() for t in h["holdings"]}
+    for d in dates:
+        if d not in close.index: continue
+        for t in held:
+            p0, p1 = prev.get(t), close.at[d, t] if t in close else float("nan")
+            split = spl is not None and d in spl.index and t in spl and spl.at[d, t] not in (0, 1) and spl.at[d, t] == spl.at[d, t]
+            if p0 and p1 == p1 and p1 > 0 and abs(p1 / p0 - 1) > 0.45 and not split:
+                b = backup_history([t], d - pd.Timedelta(days=5))
+                bp = b.at[d, t] if t in b and d in b.index else float("nan")
+                if bp == bp and abs(bp / p1 - 1) < 0.01:
+                    DATA_NOTES.append(f"{t} moved {p1 / p0 - 1:+.0%} on {d:%b %d}; confirmed by the Nasdaq backup.")
+                elif bp == bp and bp > 0:
+                    close.at[d, t] = bp; DATA_NOTES.append(f"{t} {d:%b %d}: Yahoo price {p1:.2f} looked wrong ({p1 / p0 - 1:+.0%}); used Nasdaq's {bp:.2f}.")
+                else:
+                    raise RuntimeError(f"{t} moved {p1 / p0 - 1:+.0%} on {d:%b %d} with no split and no backup price to confirm it - "
+                                       "not booked (state not saved). The health check retries.")
+        row = close.loc[d]; prev.update({t: float(row[t]) for t in row.index if row[t] == row[t] and row[t] > 0})
+    return close
 
 def run_days(st, adj, close, dates, divs=None, spl=None, quiet=False):
     cal = Calendar(adj.index); cff = close.ffill(limit=5)
@@ -828,10 +928,32 @@ def preview(a):
     out["cutoff"] = f"{hm(cut)} ET ({hm(pt)} PT)"
     adj, close, divs, spl = fetch_yf()
     if close.index[-1].date() != today:                      # no row for today yet: build it from 1-minute bars
-        last, ts = intraday_last(ALL_TICKERS)
-        row = pd.DataFrame([last.values], index=[pd.Timestamp(today)], columns=last.index)
+        try:
+            last, ts = intraday_last(ALL_TICKERS)
+            if ts.date() != today: last = None                 # no bars today (yet)
+        except Exception: last = None
+        row = pd.DataFrame([last.values], index=[pd.Timestamp(today)], columns=last.index) if last is not None else pd.DataFrame(index=[pd.Timestamp(today)], columns=close.columns, dtype=float)
         close = pd.concat([close, row.reindex(columns=close.columns)]); adj = pd.concat([adj, row.reindex(columns=adj.columns)])
+    # cross-check today's prices with live quotes from a second source: fills gaps, replaces stale prices, spots closures
+    tday = pd.Timestamp(today); live = backup_quotes(ALL_TICKERS)
+    yahoo_today = bool(close.loc[tday, SIGNAL_TICKERS].notna().all())
+    traded_today = [t for t, (p_, d_, s_) in live.items() if d_ == str(today)]
+    if not yahoo_today and live and not traded_today:
+        # both sources show no trades today: only call it a closure once the market should have been open for 30 min
+        if (now_et.hour, now_et.minute) >= (10, 0):
+            out["status"] = "closed"; out["warnings"].append("No trades today from Yahoo or live quotes: the market appears closed (unscheduled closure)."); return out
+        raise RuntimeError("No prices for today yet (before the open?) - run the preview during market hours.")
+    swapped = []
+    for t in ALL_TICKERS:
+        yp = close.at[tday, t] if t in close.columns else float("nan")
+        lp, ld, ls = live.get(t, (float("nan"), "", ""))
+        if ld == str(today) and lp > 0 and (not (yp > 0) or abs(yp / lp - 1) > 0.03):
+            close.at[tday, t] = lp; adj.at[tday, t] = lp; swapped.append(t)
+    if swapped: out["warnings"].append("Live prices from the CNBC backup for: " + ", ".join(swapped) + " (Yahoo was missing or stale).")
+    if close.loc[tday, SIGNAL_TICKERS].isna().any():
+        raise RuntimeError("No live prices for today from Yahoo or the backup - preview not possible right now.")
     out["prices_as_of"] = now_et.strftime("%H:%M") + " ET"
+    out["warnings"] += [n for n in DATA_NOTES if n not in out["warnings"]]
     if os.path.exists(STATE_PATH):
         st = copy.deepcopy(load_state())
         missed = [d for d in close.index[:-1] if d > pd.Timestamp(st["last_date"])]
@@ -935,6 +1057,7 @@ def main():
         P["fractional"] = st.get("fractional", True)
     if a.cmd == "run":
         if not dates: print("Already up to date.");
+        close = sanity_check(close, dates, st, spl)
         cal = run_days(st, adj, close, dates, divs, spl)
         save_state(st)
         ld = pd.Timestamp(st["last_date"])     # Yahoo sometimes drops a recent day it already published: use the latest prices it still has

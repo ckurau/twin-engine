@@ -15,7 +15,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: twin-engine
+  group: twin-engine-daily
   cancel-in-progress: false
 jobs:
   start:

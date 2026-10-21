@@ -18,7 +18,7 @@ permissions:
   contents: write
   issues: write
 concurrency:
-  group: twin-engine
+  group: twin-engine-preview
   cancel-in-progress: false
 jobs:
   preview:
@@ -32,7 +32,9 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Preview today's orders
         id: pv
-        run: python twin_engine.py preview ${{ (github.event_name == 'schedule' || inputs.window == 'true') && '--window' || '' }}
+        run: |
+          W="${{ (github.event_name == 'schedule' || inputs.window == 'true') && '--window' || '' }}"
+          python twin_engine.py preview $W || { echo '::warning::Preview failed - retrying with the newest yfinance'; pip install -q -U yfinance; python twin_engine.py preview $W; }
       - name: Show on the run page
         if: steps.pv.outputs.ran == '1'
         run: cat preview.md >> "$GITHUB_STEP_SUMMARY"

@@ -82,6 +82,8 @@ def c_preview():
     due = CLOSE - dt.timedelta(minutes=35)
     if NOW < CLOSE - dt.timedelta(minutes=46):
         return add("Schedule", "Today's order preview", "pending", f"Due at about {fmt_t(CLOSE - dt.timedelta(minutes=45))}.")
+    if preview.get("date") == str(TODAY.date()) and preview.get("status") == "closed":
+        return add("Schedule", "Today's order preview", "info", "Live quotes show no trading today (unscheduled market closure). No orders.")
     ok = preview.get("date") == str(TODAY.date()) and preview.get("status") in ("orders", "no_orders")
     if ok:
         n = len(preview.get("orders", []))
@@ -173,6 +175,15 @@ def c_data():
                         "Usually Yahoo catches up within hours. If this is still failing by the next morning, ask Claude.")
     elif missing: add("Data", "Price data (Yahoo Finance)", sev, f"No {want:%b %d} close yet for: {', '.join(missing)}.", "Usually fixes itself within hours; if it persists into the next session, ask Claude.")
     else: add("Data", "Price data (Yahoo Finance)", "ok", f"All {len(te.ALL_TICKERS)} tickers have the {want:%b %d} close.")
+    if te.DATA_NOTES: add("Data", "Backup price source used", "warn", " ".join(te.DATA_NOTES), "Nothing to do: the backup filled the gap. If this shows every day, Yahoo may have changed; ask Claude.")
+    try:
+        q = te.backup_quotes(["SPY", "TQQQ"]); hb = te.backup_history(["SPY"], TODAY - pd.Timedelta(days=10))
+        ok_q, ok_h = len(q) == 2, not hb.empty
+        add("Data", "Backup price sources (CNBC, Nasdaq)", "ok" if ok_q and ok_h else "warn",
+            f"Live quotes {'reachable' if ok_q else 'NOT reachable'}; daily closes {'reachable' if ok_h else 'NOT reachable'}.",
+            "" if ok_q and ok_h else "Only matters if Yahoo also fails. Ask Claude if it lasts more than a day.")
+    except Exception as e:
+        add("Data", "Backup price sources (CNBC, Nasdaq)", "warn", f"Could not test: {e}")
     r = close.pct_change().iloc[-5:]
     big = [(t, d, v) for d, row_ in r.iterrows() for t, v in row_.items() if v == v and abs(v) > 0.35]
     add("Data", "Price sanity", "warn" if big else "ok",

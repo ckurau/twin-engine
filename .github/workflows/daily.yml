@@ -12,7 +12,7 @@ permissions:
   contents: write
   issues: write       # closes the day's order notification once the close is booked
 concurrency:
-  group: twin-engine
+  group: twin-engine-daily
   cancel-in-progress: false
 jobs:
   run:
@@ -28,7 +28,7 @@ jobs:
         run: |
           set -o pipefail
           if [ ! -f state.json ]; then echo "::error::No account yet. Run the 'Start account' workflow first."; exit 1; fi
-          python twin_engine.py run | tee run.log
+          python twin_engine.py run | tee run.log || { echo '::warning::Run failed - retrying with the newest yfinance'; pip install -q -U yfinance; python twin_engine.py run | tee run.log; }
           { echo '```'; cat run.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - name: Save results
         run: |
