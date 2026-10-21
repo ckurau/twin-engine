@@ -279,6 +279,25 @@ The run about 10 minutes after the 3:15 PM ET preview leaves time to fix a missi
 A GitHub issue (phone notification through the GitHub app) is opened only when a fix doesn't work, when a problem needs a person (the account ledger is never changed automatically), or when a preview is still missing 15 minutes before the close. It closes itself when everything passes again. Warnings show only on the dashboard.
 **Watching the watcher:** turn on "notify on failure" for the three cron-job.org jobs, so cron-job.org emails you if GitHub stops accepting its calls (for example an expired token).
 
+### 8b. What can fail, and what happens automatically
+
+| Failure | Automatic response |
+|---|---|
+| cron-job.org doesn't start a job | GitHub's own schedule (hourly backup) and the health check start it; cron-job.org emails you |
+| Preview missing near the close | Health check restarts it (8 min apart, until 3:42 PM ET); you're notified at 3:30 PM ET if it's still missing |
+| Daily run failed / close not booked | Restarted every 25 min (3 a day); it catches up missed days |
+| A ticker missing from Yahoo's batch download | Re-downloaded on its own |
+| Yahoo missing a recent close or a whole day | Filled from Nasdaq's daily closes |
+| Yahoo completely down | All prices from Nasdaq (closes not dividend-adjusted; fine for a day or two) |
+| Yahoo intraday prices missing or stale in the preview | Replaced with CNBC live quotes (any gap, or >3% off) |
+| Yahoo publishes a bad price (>45% move without a split) | Checked against Nasdaq: confirmed, replaced, or not booked until it can be confirmed |
+| Unscheduled market closure | No orders, once Yahoo and CNBC both show no trades after 10:00 AM ET |
+| Yahoo changes its site and breaks yfinance | Library versions are locked; a failed run retries once with the newest yfinance |
+| A library update breaks the code | Can't happen silently: versions are locked in requirements.txt |
+| Two jobs save at once | Save retried 4 times, then fails visibly |
+| Workflow disabled / page not republished | Re-enabled / republished by the health check |
+| Account ledger problem (negative cash, stuck swap, missed days) | Never changed automatically: you're notified |
+
 ## 9. Dashboard guide
 
 | Tab | What it shows |
