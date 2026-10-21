@@ -1,6 +1,6 @@
 {
- "generated": "2026-10-21T16:07:25-04:00",
- "generated_et": "Wed Oct 21, 4:07 PM ET",
+ "generated": "2026-10-21T16:21:00-04:00",
+ "generated_et": "Wed Oct 21, 4:21 PM ET",
  "overall": "warn",
  "counts": {
   "fail": 0,
@@ -17,7 +17,7 @@
    "group": "Schedule",
    "name": "Daily run booked the last close",
    "status": "ok",
-   "detail": "Account is as of the Tue Oct 20 close.",
+   "detail": "Account is as of the Wed Oct 21 close.",
    "fix": ""
   },
   {
@@ -59,7 +59,7 @@
    "group": "Dashboard",
    "name": "Dashboard is published and current",
    "status": "ok",
-   "detail": "Live page shows the Tue Oct 20 close.",
+   "detail": "Live page shows the Wed Oct 21 close.",
    "fix": ""
   },
   {
@@ -94,7 +94,7 @@
    "group": "Account",
    "name": "9Sig bookkeeping",
    "status": "ok",
-   "detail": "Growth + reserve = $10,170 vs sleeve $10,170 (0.0% apart).",
+   "detail": "Growth + reserve = $10,370 vs sleeve $10,370 (0.0% apart).",
    "fix": ""
   },
   {
@@ -115,14 +115,14 @@
    "group": "Account",
    "name": "No missed days",
    "status": "ok",
-   "detail": "Every close since Oct 16, 2026 is booked (3 days).",
+   "detail": "Every close since Oct 16, 2026 is booked (4 days).",
    "fix": ""
   },
   {
    "group": "Account",
    "name": "Preview matched the booked close",
    "status": "ok",
-   "detail": "2026-10-20: preview orders matched the booked trades (3 tickers).",
+   "detail": "2026-10-21: preview orders matched the booked trades (0 tickers).",
    "fix": ""
   },
   {
@@ -176,6 +176,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-21T16:21:00-04:00",
+   "overall": "warn",
+   "fails": 0,
+   "warns": 1
+  },
   {
    "t": "2026-10-21T16:07:25-04:00",
    "overall": "warn",
@@ -526,12 +532,6 @@
   },
   {
    "t": "2026-10-19T20:16:25-04:00",
-   "overall": "warn",
-   "fails": 0,
-   "warns": 3
-  },
-  {
-   "t": "2026-10-19T20:11:41-04:00",
    "overall": "warn",
    "fails": 0,
    "warns": 3
