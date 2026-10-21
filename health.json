@@ -1,6 +1,6 @@
 {
- "generated": "2026-10-21T15:15:57-04:00",
- "generated_et": "Wed Oct 21, 3:15 PM ET",
+ "generated": "2026-10-21T15:25:30-04:00",
+ "generated_et": "Wed Oct 21, 3:25 PM ET",
  "overall": "warn",
  "counts": {
   "fail": 0,
@@ -38,7 +38,7 @@
    "group": "Schedule",
    "name": "On-time trigger (cron-job.org)",
    "status": "warn",
-   "detail": "No cron-job.org daily start seen for Tue Oct 20.",
+   "detail": "Preview started 3:15 PM ET today; no cron-job.org daily start seen for Tue Oct 20.",
    "fix": "Open cron-job.org > Cronjobs > History. A 401/403 means the GitHub token expired or was pasted wrong; 404 means the URL is wrong."
   },
   {
@@ -169,6 +169,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-21T15:25:30-04:00",
+   "overall": "warn",
+   "fails": 0,
+   "warns": 1
+  },
   {
    "t": "2026-10-21T15:15:57-04:00",
    "overall": "warn",
