@@ -1,14 +1,14 @@
 {
- "generated": "2026-10-21T18:19:29-04:00",
- "generated_et": "Wed Oct 21, 6:19 PM ET",
+ "generated": "2026-10-21T19:17:31-04:00",
+ "generated_et": "Wed Oct 21, 7:17 PM ET",
  "overall": "ok",
  "counts": {
   "fail": 0,
   "fixing": 0,
   "warn": 0,
   "pending": 0,
-  "ok": 19,
-  "info": 3
+  "ok": 21,
+  "info": 6
  },
  "version": "1.6.0",
  "schedule": "Every 30 minutes on weekdays 9:25 AM - 5:55 PM ET (cron-job.org), right after each preview and daily run, and hourly as a backup.",
@@ -31,7 +31,7 @@
    "group": "Schedule",
    "name": "Recent workflow runs",
    "status": "ok",
-   "detail": "Latest run of each workflow succeeded (4 workflows).",
+   "detail": "Latest run of each workflow succeeded (5 workflows).",
    "fix": ""
   },
   {
@@ -77,6 +77,13 @@
    "fix": ""
   },
   {
+   "group": "Data",
+   "name": "Every ETF still trades",
+   "status": "ok",
+   "detail": "All 22 ETFs traded on the Oct 21 session.",
+   "fix": ""
+  },
+  {
    "group": "Account",
    "name": "Cash, shares and prices",
    "status": "ok",
@@ -116,6 +123,34 @@
    "name": "Preview matched the booked close",
    "status": "ok",
    "detail": "2026-10-21: preview orders matched the booked trades (0 tickers).",
+   "fix": ""
+  },
+  {
+   "group": "Guardrails",
+   "name": "Drawdown",
+   "status": "ok",
+   "detail": "0.0% from the high. Drops to -40% are normal for this strategy.",
+   "fix": ""
+  },
+  {
+   "group": "Guardrails",
+   "name": "Last 12 months",
+   "status": "info",
+   "detail": "Checked after 12 months live (now 5 days, +3.9% since the start).",
+   "fix": ""
+  },
+  {
+   "group": "Guardrails",
+   "name": "3-year check vs SPY",
+   "status": "info",
+   "detail": "Checked after 3 years live: switch to an index fund if CAGR trails SPY by 10+ points or is under 5% a year.",
+   "fix": ""
+  },
+  {
+   "group": "Guardrails",
+   "name": "Real account follows the orders",
+   "status": "info",
+   "detail": "Starts at go-live (2026-10-26).",
    "fix": ""
   },
   {
@@ -169,6 +204,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-21T19:17:31-04:00",
+   "overall": "ok",
+   "fails": 0,
+   "warns": 0
+  },
   {
    "t": "2026-10-21T18:19:29-04:00",
    "overall": "ok",
@@ -519,12 +560,6 @@
   },
   {
    "t": "2026-10-20T09:55:27-04:00",
-   "overall": "ok",
-   "fails": 0,
-   "warns": 0
-  },
-  {
-   "t": "2026-10-20T09:25:35-04:00",
    "overall": "ok",
    "fails": 0,
    "warns": 0
