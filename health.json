@@ -1,13 +1,13 @@
 {
- "generated": "2026-10-21T23:17:33-04:00",
- "generated_et": "Wed Oct 21, 11:17 PM ET",
+ "generated": "2026-10-22T09:25:23-04:00",
+ "generated_et": "Thu Oct 22, 9:25 AM ET",
  "overall": "ok",
  "counts": {
   "fail": 0,
   "fixing": 0,
   "warn": 0,
-  "pending": 0,
-  "ok": 21,
+  "pending": 1,
+  "ok": 20,
   "info": 7
  },
  "version": "1.7.0",
@@ -23,8 +23,8 @@
   {
    "group": "Schedule",
    "name": "Today's order preview",
-   "status": "ok",
-   "detail": "Arrived 15:15 ET: no orders today.",
+   "status": "pending",
+   "detail": "Due at about Thu Oct 22, 3:15 PM ET.",
    "fix": ""
   },
   {
@@ -38,7 +38,7 @@
    "group": "Schedule",
    "name": "On-time trigger (cron-job.org)",
    "status": "ok",
-   "detail": "Preview started 3:15 PM ET today; daily run started Wed 04:20 PM ET.",
+   "detail": "Daily run started Wed 04:20 PM ET.",
    "fix": ""
   },
   {
@@ -185,7 +185,7 @@
    "group": "Configuration",
    "name": "cron-job.org GitHub token",
    "status": "ok",
-   "detail": "Expires Oct 19, 2027 (363 days).",
+   "detail": "Expires Oct 19, 2027 (362 days).",
    "fix": ""
   },
   {
@@ -211,6 +211,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-22T09:25:23-04:00",
+   "overall": "ok",
+   "fails": 0,
+   "warns": 0
+  },
   {
    "t": "2026-10-21T23:17:33-04:00",
    "overall": "ok",
@@ -564,16 +570,10 @@
    "overall": "warn",
    "fails": 0,
    "warns": 1
-  },
-  {
-   "t": "2026-10-20T12:15:56-04:00",
-   "overall": "warn",
-   "fails": 0,
-   "warns": 1
   }
  ],
  "remediation": {
-  "date": "2026-10-21",
+  "date": "2026-10-22",
   "counts": {},
   "log": []
  },
