@@ -33,7 +33,10 @@ DEFAULTS = dict(growth=("TQQQ",), derisk_asset=None, def_trend=False, def_sma=20
                 core_ew=False, tom_trend=False,
                 growth_rot=None, nine_cap=None, lds_riskoff=False, ndx_cap=None, dip_kind="rsi2",
                 cash_yield=False, core_trend="sma", core_erc=False, vol_fast=False, def_relmom=None, def_lev_trend=False,
-                nine_buy_only=False, vol_target_trend=None, lds_max_lev=False, core_mom_weight=False, growth_vol_blend=False)
+                nine_buy_only=False, vol_target_trend=None, lds_max_lev=False, core_mom_weight=False, growth_vol_blend=False,
+                vol_semi=False, vol_park=False, vol_off_high=None, vrp=None, vol_hyst=None, vol_floor=None, cppi=None,
+                regime_split=None, santa=False, nfp=False, wk_dip=None, nine_tp=None, nine_bd=None, sig_rate_trend=None,
+                def_invvol=False, lds_corr_cut=False, lds_idle=None, dual_fast=50)
 LEV_OF = {t: (a, L) for (a, L), t in ETF.items()}
 
 def p(k): return P.get(k, DEFAULTS[k])
@@ -71,10 +74,21 @@ def vol_switch(px, adj, date):
     elif p("vol_ewm_hl"): v = float(np.sqrt(r.iloc[-200:].ewm(halflife=p("vol_ewm_hl")).var().iloc[-1] * 252))
     else:
         rr = r.iloc[-P["vol_lookback"]:]; v = float(rr.std(ddof=1) * math.sqrt(252)) if len(rr) >= P["vol_lookback"] else float("nan")
+        if p("vol_semi") and len(rr) >= 10: v = float(math.sqrt(2 * (np.minimum(rr.values, 0) ** 2).mean()) * math.sqrt(252))
+        if p("vol_park"):
+            h, l = adj["QQQ_H"].iloc[-P["vol_lookback"]:], adj["QQQ_L"].iloc[-P["vol_lookback"]:]
+            x = np.log(h / l).dropna()
+            if len(x) >= 10: v = float(3 * math.sqrt((x ** 2).mean() / (4 * math.log(2)) * 252))
         if p("vol_fast") and len(r) >= 10: v = max(v, float(r.iloc[-10:].std(ddof=1) * math.sqrt(252)))
     tgt = p("vol_target_winter") if p("vol_target_winter") and date.month in (11, 12, 1, 2, 3, 4) else P["vol_target"]
     if p("vol_target_trend"):
         q = adj["QQQ"].dropna(); tgt = p("vol_target_trend")[0] if float(q.iloc[-1]) > float(q.iloc[-200:].mean()) else p("vol_target_trend")[1]
+    if p("vrp"):
+        ratio, hi = p("vrp"); s_ = adj["SPY"].dropna().pct_change().iloc[-20:]; rv = float(s_.std() * math.sqrt(252) * 100)
+        if rv > 0 and float(adj["VIXLVL"].iloc[-1]) / rv > ratio: tgt = hi
+    if p("vol_off_high") is not None:
+        q = adj["QQQ"].dropna()
+        if float(q.iloc[-1]) >= (1 - p("vol_off_high")) * float(q.iloc[-252:].max()): return 1.0, v
     if not v or math.isnan(v): return 1.0, v
     return float(min(max((tgt / v) ** P["vol_power"], 0.0), 1.0)), v
 
@@ -123,6 +137,8 @@ def dip_signal(adj, kind, th):
         hits.append(len(v) > 13 and all(v.iloc[-1 - j] >= 1.05 * float(v.iloc[-11 - j:-1 - j].mean()) for j in range(3)))
     return any(hits)
 
+def uptrend_pre(q): return float(q.iloc[-1]) > float(q.iloc[-200:].mean())
+
 def rsi2(s):
     r = s.diff().iloc[-3:]
     up = r.clip(lower=0).ewm(alpha=1 / 2, adjust=False).mean().iloc[-1]; dn = (-r.clip(upper=0)).ewm(alpha=1 / 2, adjust=False).mean().iloc[-1]
@@ -139,6 +155,10 @@ def lds_exposures(adj):
         diag[a] = dict(price=float(s.iloc[-1]), sma=sma, trend="UP" if up else "DOWN", vol63=v, mom_blend=float(bm))
         m12 = _mom(s, 12)
         if p("core_trend") == "or_mom": up = up or (m12 == m12 and m12 > 0)
+        elif p("core_trend") == "dual": up = up and float(s.iloc[-p("dual_fast"):].mean()) > sma
+        if p("lds_corr_cut") and a == "TLT" and "SPY" in px:
+            c = float(np.corrcoef(r["SPY"].iloc[-63:], r["TLT"].iloc[-63:])[0, 1])
+            if c > 0: up = False
         elif p("core_trend") == "and_mom": up = up and (m12 == m12 and m12 > 0)
         if up: core[a] = 1.0 if p("core_ew") else (max(bm, 0.0) + 1e-4) / v if p("core_mom_weight") else 1 / v
     if p("core_topk") and len(core) > p("core_topk"):
@@ -182,6 +202,7 @@ def implement(expo, kmax=3):
             L = lev_for(a, e, k); caps[ETF[(a, L)]] = caps.get(ETF[(a, L)], 0) + abs(e) / abs(L)
         if sum(caps.values()) <= 1 + 1e-9:
             if p("lds_max_lev") and sum(caps.values()) < 1 - 1e-6: caps["BIL"] = caps.get("BIL", 0) + 1 - sum(caps.values())
+            if p("lds_idle") and sum(caps.values()) < 1 - 1e-6: caps[p("lds_idle")] = caps.get(p("lds_idle"), 0) + 1 - sum(caps.values())
             return caps
     caps = {}
     for a, e in expo.items():
@@ -209,7 +230,8 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
     if nine["initialized"] and prev:
         rq = np.mean([close[t] / prev[t] - 1 for t in growth])
         dh = nine.get("def_hold") or deff
-        rd = np.mean([close[t] / prev[t] - 1 for t in dh])
+        dw = nine.get("def_w") or {t: 1 / len(dh) for t in dh}
+        rd = sum(dw.get(t, 0) * (close[t] / prev[t] - 1) for t in set(dh))
         rx = close[p("derisk_asset")] / prev[p("derisk_asset")] - 1 if p("derisk_asset") else rd
         a = nine["w"] * rq + (1 - nine["w"]) * rx
         nine["S"] *= 1 + a; nine["B"] *= 1 + rd; nine["growth_index"] *= 1 + a
@@ -220,13 +242,21 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
     if q_end and nine["initialized"]:
         qr = nine["growth_index"] / nine["q_anchor"] - 1; nine["q_anchor"] = nine["growth_index"]
         if qr <= P["crash_qtr"]: nine["skips"] = P["skip_after_crash"]
-        target = nine["last_target"] * (1 + P["sig_rate"]) + 0.5 * nine["new_cash"]
+        q_ = adj["QQQ"].dropna(); rate = P["sig_rate"]
+        if p("sig_rate_trend"): rate = p("sig_rate_trend")[0] if float(q_.iloc[-1]) > float(q_.iloc[-200:].mean()) else p("sig_rate_trend")[1]
+        target = nine["last_target"] * (1 + rate) + 0.5 * nine["new_cash"]
         diff = target - nine["S"]
         if diff < 0 and nine["skips"] > 0: nine["skips"] -= 1
         elif diff < 0 and p("nine_buy_only"): pass
         elif diff < 0: nine["S"] += diff; nine["B"] -= diff
         else: buy = min(diff, nine["B"]); nine["S"] += buy; nine["B"] -= buy
         nine["last_target"] = nine["S"]; nine["new_cash"] = 0.0; nine_trade = True
+    if nine["initialized"] and not q_end and cal.is_month_end(date) and (p("nine_tp") or p("nine_bd")):
+        tgt_q = nine["last_target"] * (1 + P["sig_rate"])
+        if p("nine_tp") and nine["S"] > tgt_q * (1 + p("nine_tp")):
+            x = nine["S"] - tgt_q; nine["S"] -= x; nine["B"] += x; nine_trade = True
+        elif p("nine_bd") and nine["S"] < tgt_q * (1 - p("nine_bd")):
+            x = min(tgt_q - nine["S"], nine["B"]); nine["S"] += x; nine["B"] -= x; nine_trade = True
     # --- split between engines
     lds_force = not st["last_date"]
     rebal = cal.is_rebalance_day(date)
@@ -237,6 +267,12 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
     if p("rebal_band") is not None and st["last_date"] and cal.is_month_end(date):
         sh = sleeve_value(st, "9SIG", close) / total_value(st, close)
         if abs(sh - P["split_9sig"]) > p("rebal_band"): rebal = True
+    if p("regime_split") and st["last_date"]:
+        q_ = adj["QQQ"].dropna(); want = p("regime_split")[0] if float(q_.iloc[-1]) > float(q_.iloc[-200:].mean()) else p("regime_split")[1]
+        if rebal: split = want
+        elif cal.is_month_end(date):
+            sh = sleeve_value(st, "9SIG", close) / total_value(st, close)
+            if abs(sh - want) > 0.05: rebal = True; split = want
     if rebal and st["last_date"]:
         v9, vl = sleeve_value(st, "9SIG", close), sleeve_value(st, "LDS", close)
         tot = v9 + vl; t9 = tot * split; move = t9 - v9
@@ -268,8 +304,13 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
     else:
         vt = adj[growth[0]].dropna()
     raw, v20 = vol_switch(vt, adj, date)
-    if abs(raw - nine["w_base"]) > P["vol_band"] or not nine["initialized"]: nine["w_base"] = raw
-    base = nine["w_base"]
+    if p("cppi") and v20 == v20 and v20 > 0:
+        eqv = [e["value"] for e in st["equity"][-750:]]
+        dd_ = (eqv[-1] / max(eqv) - 1) if eqv else 0.0
+        tgt_e = P["vol_target"] * max(0.5, 1 + p("cppi") * dd_); raw = float(min(max((tgt_e / v20) ** P["vol_power"], 0.0), 1.0))
+    cut_b, add_b = p("vol_hyst") or (P["vol_band"], P["vol_band"])
+    if (raw < nine["w_base"] - cut_b) or (raw > nine["w_base"] + add_b) or not nine["initialized"]: nine["w_base"] = raw
+    base = nine["w_base"] if p("vol_floor") is None else max(nine["w_base"], p("vol_floor"))
     qqq = adj["QQQ"].dropna()
     if p("growth_trend_cap") is not None and float(qqq.iloc[-1]) < float(qqq.iloc[-200:].mean()): base = min(base, p("growth_trend_cap"))
     tomorrow = cal.next_day(date); tom = cal.is_tom(tomorrow)
@@ -277,6 +318,16 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
     uptrend = float(qqq.iloc[-1]) > float(qqq.iloc[-200:].mean())
     if p("tom_trend") and not uptrend: tom = False
     full = tom or (p("swap_9sig") and bull)
+    if p("santa"):
+        i_ = cal._pos.get(tomorrow)
+        d0, nj = (p("santa") if isinstance(p("santa"), tuple) else (22, 2))
+        if i_ is not None and ((tomorrow.month == 12 and tomorrow.day >= d0) or (tomorrow.month == 1 and sum(1 for k in range(1, 6) if i_ - k >= 0 and cal.days[i_ - k].month == 1) < nj)): full = True
+    if p("nfp") and tomorrow.weekday() == 4 and tomorrow.day <= 7: full = True
+    if p("wk_dip"):
+        thr, n_ = p("wk_dip"); left = nine.get("wk_left", 0)
+        if len(qqq) > 6 and float(qqq.iloc[-1] / qqq.iloc[-6] - 1) < -thr and uptrend_pre(qqq): left = n_
+        else: left = max(0, left - 1)
+        nine["wk_left"] = left; full = full or left > 0
     roff = riskoff(st, adj, cal, date)
     if p("nine_dip") is not None:
         r2 = rsi2(qqq); on = nine.get("dip_on", False)
@@ -295,6 +346,10 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
     if p("def_lev_trend"):
         lev = {"TLT": "TMF", "GLD": "UGL", "IEF": "TYD"}
         def_new = [lev.get(t, t) if float(adj[t].iloc[-1]) >= _sma(adj[t].dropna(), 200) else "BIL" for t in deff]
+    if p("def_invvol") and len(set(def_new)) > 1:
+        iv = {t: 1 / max(float(adj[t].pct_change().iloc[-63:].std()), 1e-6) for t in set(def_new)}; tot_ = sum(iv.values())
+        new_w = {t: round(v / tot_, 2) for t, v in iv.items()}
+        if new_w != nine.get("def_w") and (cal.is_month_end(date) or not nine.get("def_w")): nine["def_w"] = new_w; nine_trade = True
     def_changed = (nine.get("def_hold") or deff) != def_new
     if abs(w_new - nine["w"]) > 1e-9 or nine_trade or def_changed:
         nine["w"] = w_new; nine["def_hold"] = def_new
@@ -305,7 +360,8 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
         rest = (1 - nine["w"]) * nine["S"]
         if p("derisk_asset"): tg[p("derisk_asset")] += rest; dfn = nine["B"]
         else: dfn = rest + nine["B"]
-        for t in def_new: tg[t] += dfn / len(def_new)
+        dw = nine.get("def_w") if p("def_invvol") and nine.get("def_w") else {t: def_new.count(t) / len(def_new) for t in set(def_new)}
+        for t, wt in dw.items(): tg[t] += dfn * wt
         set_targets(st, "9SIG", dict(tg), close, date, "9Sig rebalance")
         nine["initialized"] = True
     # --- LDS: bullish-session swap (Fed day and optional calendar/dip days)
