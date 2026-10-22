@@ -1,6 +1,6 @@
 {
- "generated": "2026-10-22T16:25:27-04:00",
- "generated_et": "Thu Oct 22, 4:25 PM ET",
+ "generated": "2026-10-22T16:34:03-04:00",
+ "generated_et": "Thu Oct 22, 4:34 PM ET",
  "overall": "ok",
  "counts": {
   "fail": 0,
@@ -45,7 +45,7 @@
    "group": "Schedule",
    "name": "On-time trigger (cron-job.org)",
    "status": "ok",
-   "detail": "Preview started 3:15 PM ET today; daily run started Wed 04:20 PM ET.",
+   "detail": "Preview started 3:15 PM ET today; daily run started Thu 04:20 PM ET.",
    "fix": ""
   },
   {
@@ -211,6 +211,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-22T16:34:03-04:00",
+   "overall": "ok",
+   "fails": 0,
+   "warns": 0
+  },
   {
    "t": "2026-10-22T16:25:27-04:00",
    "overall": "ok",
@@ -561,12 +567,6 @@
   },
   {
    "t": "2026-10-20T19:16:07-04:00",
-   "overall": "ok",
-   "fails": 0,
-   "warns": 0
-  },
-  {
-   "t": "2026-10-20T19:12:12-04:00",
    "overall": "ok",
    "fails": 0,
    "warns": 0
