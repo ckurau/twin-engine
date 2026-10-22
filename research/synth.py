@@ -44,6 +44,7 @@ def build(verbose=True):
     R["XLK"] = _ret(adj["XLK"]); R["SOXX"] = splice(adj["SOXX"], adj["^SOX"]); R["XLU"] = _ret(adj["XLU"])
     R["IWM"] = splice(adj["IWM"], adj["^RUT"], add=0.012); R["VNQ"] = splice(adj["VNQ"], adj["VGSIX"])
     R["XLE"] = _ret(adj["XLE"]); R["XLV"] = _ret(adj["XLV"]); R["XLF"] = _ret(adj["XLF"]); R["DBC"] = _ret(adj["DBC"])
+    R["DIA"] = splice(adj["DIA"], adj["^DJI"], add=0.02)
     R = pd.DataFrame(R).reindex(days)
 
     # leveraged / inverse ETFs: (ticker, underlying, L, fee)
@@ -51,7 +52,8 @@ def build(verbose=True):
            ("UPRO", "SPY", 3, .0091), ("SSO", "SPY", 2, .0089), ("SPXU", "SPY", -3, .0090), ("SDS", "SPY", -2, .0090), ("SH", "SPY", -1, .0089),
            ("TMF", "TLT", 3, .0106), ("UBT", "TLT", 2, .0095), ("TMV", "TLT", -3, .0095), ("TBT", "TLT", -2, .0090), ("TBF", "TLT", -1, .0092),
            ("UGL", "GLD", 2, .0095), ("GLL", "GLD", -2, .0095), ("TYD", "IEF", 3, .0109), ("TECL", "XLK", 3, .0094), ("SOXL", "SOXX", 3, .0076),
-           ("EDC", "EEM", 3, .0110), ("UTSL", "XLU", 3, .0095), ("TNA", "IWM", 3, .0110)]
+           ("EDC", "EEM", 3, .0110), ("UTSL", "XLU", 3, .0095), ("TNA", "IWM", 3, .0110),
+           ("UDOW", "DIA", 3, .0095), ("FAS", "XLF", 3, .0094), ("ERX", "XLE", 3, .0095), ("CURE", "XLV", 3, .0095)]
     real = pd.read_pickle(os.path.join(D, "adj.pkl")).reindex(days)
     calib = []
     for tk, u, L, fee in LEV:

@@ -33,7 +33,7 @@ DEFAULTS = dict(growth=("TQQQ",), derisk_asset=None, def_trend=False, def_sma=20
                 core_ew=False, tom_trend=False,
                 growth_rot=None, nine_cap=None, lds_riskoff=False, ndx_cap=None, dip_kind="rsi2",
                 cash_yield=False, core_trend="sma", core_erc=False, vol_fast=False, def_relmom=None, def_lev_trend=False,
-                nine_buy_only=False, vol_target_trend=None, lds_max_lev=False, core_mom_weight=False)
+                nine_buy_only=False, vol_target_trend=None, lds_max_lev=False, core_mom_weight=False, growth_vol_blend=False)
 LEV_OF = {t: (a, L) for (a, L), t in ETF.items()}
 
 def p(k): return P.get(k, DEFAULTS[k])
@@ -263,7 +263,10 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
         if pick != nine.get("gasset"):
             nine["gasset"] = pick; growth = [pick]; nine_trade = True
     # --- 9Sig weight for tomorrow
-    vt = adj[growth[0]].dropna()
+    if len(set(growth)) > 1 and p("growth_vol_blend"):     # mixed growth sub-sleeve: volatility of the mix (weights = repeats in the tuple)
+        vt = (1 + adj[growth].pct_change().fillna(0).mean(axis=1)).cumprod()
+    else:
+        vt = adj[growth[0]].dropna()
     raw, v20 = vol_switch(vt, adj, date)
     if abs(raw - nine["w_base"]) > P["vol_band"] or not nine["initialized"]: nine["w_base"] = raw
     base = nine["w_base"]
