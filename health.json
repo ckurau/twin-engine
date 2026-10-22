@@ -1,13 +1,13 @@
 {
- "generated": "2026-10-21T19:21:50-04:00",
- "generated_et": "Wed Oct 21, 7:21 PM ET",
- "overall": "ok",
+ "generated": "2026-10-21T20:04:04-04:00",
+ "generated_et": "Wed Oct 21, 8:04 PM ET",
+ "overall": "warn",
  "counts": {
   "fail": 0,
   "fixing": 0,
-  "warn": 0,
+  "warn": 1,
   "pending": 0,
-  "ok": 21,
+  "ok": 20,
   "info": 6
  },
  "version": "1.6.0",
@@ -58,9 +58,9 @@
   {
    "group": "Data",
    "name": "Price data (Yahoo Finance)",
-   "status": "ok",
-   "detail": "All 22 tickers have the Oct 21 close.",
-   "fix": ""
+   "status": "warn",
+   "detail": "Yahoo doesn't have the Oct 21 close yet (latest Oct 20, 4 h after that close).",
+   "fix": "Usually Yahoo catches up within hours. If this is still failing by the next morning, ask Claude."
   },
   {
    "group": "Data",
@@ -171,7 +171,7 @@
    "group": "Configuration",
    "name": "Market holiday calendar",
    "status": "ok",
-   "detail": "Covers trading days through Oct 21, 2027.",
+   "detail": "Covers trading days through Oct 22, 2027.",
    "fix": ""
   },
   {
@@ -204,6 +204,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-21T20:04:04-04:00",
+   "overall": "warn",
+   "fails": 0,
+   "warns": 1
+  },
   {
    "t": "2026-10-21T19:21:50-04:00",
    "overall": "ok",
@@ -557,12 +563,6 @@
    "overall": "warn",
    "fails": 0,
    "warns": 2
-  },
-  {
-   "t": "2026-10-20T10:55:26-04:00",
-   "overall": "ok",
-   "fails": 0,
-   "warns": 0
   }
  ],
  "remediation": {
