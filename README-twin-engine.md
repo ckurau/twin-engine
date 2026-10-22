@@ -76,6 +76,8 @@ Monte Carlo: 20,000 paths that resample real 12-month blocks of the v1.6.0 backt
 
 In the realistic case 12% of paths fall more than 50% at some point (typical worst drop -40%). This is a range, not a promise.
 
+**Tech-reliance check (Oct 21, 2026):** mixing non-tech 3x ETFs into 9Sig's growth engine (UPRO, UDOW, TNA, CURE, FAS, ERX) was worse when the volatility switch read the mix (2000–02 crash −28% to −63% vs −4.8%: TQQQ's volatility is the early warning). Keeping the switch on TQQQ while holding a mix costs 1.5–3 pts a year (TQQQ 75/UPRO 25: 34.8%; 50/50: 33.3%) for a similar drawdown, but halves Nasdaq concentration; its payoff would come only in a slow, crash-free tech slump the history doesn't contain. **Decision: keep v1.6 (TQQQ only).**
+
 **Split check (Oct 19, 2026):** 60/40 and 70/30 were tested as ways to trade drawdown for return. After 20 years (realistic median, same deposits): 50/50 $4.08M, 60/40 $4.43M (+8%), 70/30 $4.57M (+12%); chance of a drop worse than 50%: 9%, 13%, 26%. **Decision: stay at 50/50.**
 
 Replays use 0.05% slippage per fill (stricter than the engine's default 0.02%). Typical year: ~40 trade days.
