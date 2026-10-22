@@ -1,16 +1,16 @@
 {
- "generated": "2026-10-21T20:54:08-04:00",
- "generated_et": "Wed Oct 21, 8:54 PM ET",
- "overall": "warn",
+ "generated": "2026-10-21T23:17:33-04:00",
+ "generated_et": "Wed Oct 21, 11:17 PM ET",
+ "overall": "ok",
  "counts": {
   "fail": 0,
   "fixing": 0,
-  "warn": 1,
+  "warn": 0,
   "pending": 0,
-  "ok": 20,
-  "info": 6
+  "ok": 21,
+  "info": 7
  },
- "version": "1.6.0",
+ "version": "1.7.0",
  "schedule": "Every 30 minutes on weekdays 9:25 AM - 5:55 PM ET (cron-job.org), right after each preview and daily run, and hourly as a backup.",
  "checks": [
   {
@@ -58,9 +58,9 @@
   {
    "group": "Data",
    "name": "Price data (Yahoo Finance)",
-   "status": "warn",
-   "detail": "Yahoo doesn't have the Oct 21 close yet (latest Oct 20, 5 h after that close).",
-   "fix": "Usually Yahoo catches up within hours. If this is still failing by the next morning, ask Claude."
+   "status": "ok",
+   "detail": "All 22 tickers have the Oct 21 close.",
+   "fix": ""
   },
   {
    "group": "Data",
@@ -113,6 +113,13 @@
   },
   {
    "group": "Account",
+   "name": "LDS rules applied",
+   "status": "info",
+   "detail": "LDS switches to the v1.7.0 rules at the next close (one-time rebalance).",
+   "fix": ""
+  },
+  {
+   "group": "Account",
    "name": "No missed days",
    "status": "ok",
    "detail": "Every close since Oct 16, 2026 is booked (4 days).",
@@ -157,7 +164,7 @@
    "group": "Configuration",
    "name": "Versions match",
    "status": "ok",
-   "detail": "Engine 1.6.0, dashboard data 1.6.0, backtest 1.6.0.",
+   "detail": "Engine 1.7.0, dashboard data 1.7.0, backtest 1.7.0.",
    "fix": ""
   },
   {
@@ -204,6 +211,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-21T23:17:33-04:00",
+   "overall": "ok",
+   "fails": 0,
+   "warns": 0
+  },
   {
    "t": "2026-10-21T20:54:08-04:00",
    "overall": "warn",
@@ -556,12 +569,6 @@
    "t": "2026-10-20T12:15:56-04:00",
    "overall": "warn",
    "fails": 0,
-   "warns": 1
-  },
-  {
-   "t": "2026-10-20T11:55:33-04:00",
-   "overall": "fail",
-   "fails": 1,
    "warns": 1
   }
  ],
