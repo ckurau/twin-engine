@@ -33,6 +33,7 @@ def stats(eq: pd.Series, trade_days=None):
 def run(overrides=None, start="2000-01-03", end=None, capital=20000.0, slippage_bps=5.0, panel=None, hooks=None, lab=True):
     px = PANEL if panel is None else panel
     te.P.clear(); te.P.update(_BASE_P); te.P.update(dict(slippage_bps=slippage_bps, min_order=0.0, fractional=True))
+    te_lab.LDS_MEM.clear()
     if overrides: te.P.update(overrides)
     saved = {}
     for k, v in (hooks or {}).items(): saved[k] = getattr(te, k, None); setattr(te, k, v)

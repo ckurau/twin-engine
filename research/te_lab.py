@@ -36,7 +36,11 @@ DEFAULTS = dict(growth=("TQQQ",), derisk_asset=None, def_trend=False, def_sma=20
                 nine_buy_only=False, vol_target_trend=None, lds_max_lev=False, core_mom_weight=False, growth_vol_blend=False,
                 vol_semi=False, vol_park=False, vol_off_high=None, vrp=None, vol_hyst=None, vol_floor=None, cppi=None,
                 regime_split=None, santa=False, nfp=False, wk_dip=None, nine_tp=None, nine_bd=None, sig_rate_trend=None,
-                def_invvol=False, lds_corr_cut=False, lds_idle=None, dual_fast=50)
+                def_invvol=False, lds_corr_cut=False, lds_idle=None, dual_fast=50,
+                dual_ema=False, tri_fast=None, dual_band=None, overlay_dual=False, lds_exit_check=None, core_strength=None,
+                nine_dual_cap=None, def_dual=False, lds_crash=None, dd_boost=None, swap_fomc_dual=False, q_gate=None, q_sell_skip_dual=False,
+                mom_skip1=False, dip_lev=None)
+LDS_MEM = {}      # per-run memory for hysteresis (reset by bt.run)
 LEV_OF = {t: (a, L) for (a, L), t in ETF.items()}
 
 def p(k): return P.get(k, DEFAULTS[k])
@@ -152,15 +156,25 @@ def lds_exposures(adj):
     for a in A:
         s = px[a]; sma = float(s.iloc[-P["sma_days"]:].mean()); up = float(s.iloc[-1]) >= sma
         v = te._vol(r[a], n); bm = np.nanmean([_mom(s, k) for k in p("mom_months")])
+        if p("mom_skip1") and len(s) > 253: bm = float(s.iloc[-22] / s.iloc[-253] - 1)
         diag[a] = dict(price=float(s.iloc[-1]), sma=sma, trend="UP" if up else "DOWN", vol63=v, mom_blend=float(bm))
         m12 = _mom(s, 12)
         if p("core_trend") == "or_mom": up = up or (m12 == m12 and m12 > 0)
-        elif p("core_trend") == "dual": up = up and float(s.iloc[-p("dual_fast"):].mean()) > sma
+        elif p("core_trend") == "dual":
+            f_ = float(s.iloc[-p("dual_fast"):].ewm(span=p("dual_fast")).mean().iloc[-1]) if p("dual_ema") else float(s.iloc[-p("dual_fast"):].mean())
+            if p("dual_band"):
+                was = LDS_MEM.get(a, False); b_ = p("dual_band")
+                up = (float(s.iloc[-1]) >= sma * (1 + (0 if was else b_)) and f_ > sma * (1 + (-b_ if was else b_)))
+                LDS_MEM[a] = up
+            else: up = up and f_ > sma
+            if p("tri_fast"): up = up and float(s.iloc[-p("tri_fast"):].mean()) > f_
+            diag[a]["fast_ratio"] = f_ / sma - 1
         if p("lds_corr_cut") and a == "TLT" and "SPY" in px:
             c = float(np.corrcoef(r["SPY"].iloc[-63:], r["TLT"].iloc[-63:])[0, 1])
             if c > 0: up = False
         elif p("core_trend") == "and_mom": up = up and (m12 == m12 and m12 > 0)
         if up: core[a] = 1.0 if p("core_ew") else (max(bm, 0.0) + 1e-4) / v if p("core_mom_weight") else 1 / v
+        if up and p("core_strength") and "fast_ratio" in diag[a]: core[a] *= min(1.0, max(diag[a]["fast_ratio"], 0) / p("core_strength"))
     if p("core_topk") and len(core) > p("core_topk"):
         keep = sorted(core, key=lambda a: -diag[a]["mom_blend"])[:p("core_topk")]; core = {a: core[a] for a in keep}
     def scale(w, V):
@@ -179,7 +193,9 @@ def lds_exposures(adj):
         bm = diag[a]["mom_blend"]
         if np.isnan(bm): continue
         if bm <= 0 and (p("overlay_long_only") or not any(L < 0 for L in LEVS[a])): continue
-        ov[a] = (1 if bm > 0 else -1) / diag[a]["vol63"]
+        sgn = (1 if bm > 0 else -1)
+        if p("overlay_dual"): sgn = 1 if diag[a]["trend"] == "UP" else -1
+        ov[a] = sgn / diag[a]["vol63"]
     ov = scale(ov, P["lds_overlay_vol"])
     ex = defaultdict(float)
     for a, e in core.items(): ex[a] += P["lds_core"] * e
@@ -246,6 +262,10 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
         if p("sig_rate_trend"): rate = p("sig_rate_trend")[0] if float(q_.iloc[-1]) > float(q_.iloc[-200:].mean()) else p("sig_rate_trend")[1]
         target = nine["last_target"] * (1 + rate) + 0.5 * nine["new_cash"]
         diff = target - nine["S"]
+        q_ = adj["QQQ"].dropna(); qd_ = float(q_.iloc[-30:].mean()) > float(q_.iloc[-210:].mean())
+        if diff > 0 and p("q_gate") == "skip_buys" and not qd_: diff = 0.0
+        if diff > 0 and p("q_gate") == "half_buys" and not qd_: diff *= 0.5
+        if diff < 0 and p("q_sell_skip_dual") and qd_: diff = 0.0
         if diff < 0 and nine["skips"] > 0: nine["skips"] -= 1
         elif diff < 0 and p("nine_buy_only"): pass
         elif diff < 0: nine["S"] += diff; nine["B"] -= diff
@@ -313,6 +333,12 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
     base = nine["w_base"] if p("vol_floor") is None else max(nine["w_base"], p("vol_floor"))
     qqq = adj["QQQ"].dropna()
     if p("growth_trend_cap") is not None and float(qqq.iloc[-1]) < float(qqq.iloc[-200:].mean()): base = min(base, p("growth_trend_cap"))
+    qdual = float(qqq.iloc[-30:].mean()) > float(qqq.iloc[-210:].mean()) and float(qqq.iloc[-1]) > float(qqq.iloc[-210:].mean())
+    if p("nine_dual_cap") is not None and not qdual: base = min(base, p("nine_dual_cap"))
+    if p("dd_boost"):
+        eqv = [e["value"] for e in st["equity"][-750:]]
+        if eqv and eqv[-1] / max(eqv) - 1 < -p("dd_boost")[0] and v20 == v20 and v20 > 0:
+            base = max(base, float(min(1.0, (p("dd_boost")[1] / v20) ** P["vol_power"])))
     tomorrow = cal.next_day(date); tom = cal.is_tom(tomorrow)
     bull = _bullish(st, cal, date, tomorrow, adj)
     uptrend = float(qqq.iloc[-1]) > float(qqq.iloc[-200:].mean())
@@ -341,6 +367,8 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
     if p("def_trend"):
         def_new = [t for t in deff if float(adj[t].iloc[-1]) >= float(adj[t].iloc[-p("def_sma"):].mean())] or ["BIL"]
         if len(def_new) < len(deff) and "BIL" not in def_new: def_new = def_new + ["BIL"] * (len(deff) - len(def_new))
+    if p("def_dual"):
+        def_new = [t if (float(adj[t].iloc[-1]) > _sma(adj[t].dropna(), 210) and _sma(adj[t].dropna(), 30) > _sma(adj[t].dropna(), 210)) else "BIL" for t in deff]
     if p("def_relmom"):
         sc = {t: _mom(adj[t].dropna(), p("def_relmom")) for t in deff}; def_new = [max(sc, key=sc.get)]
     if p("def_lev_trend"):
@@ -383,7 +411,14 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
         caps = implement(ex, kmax); vl = sleeve_value(st, "LDS", close)
         set_targets(st, "LDS", lds_targets(caps, vl), close, date, "Swap ends: LDS positions restored")
         lds["exposures"] = ex; lds["swap"] = dict(active=False); swapped_back = True
-    if (lds_review_due(cal, date) or lds_force) and not swapped_back and not sw.get("active"):
+    exit_due = False
+    if p("lds_exit_check") and not lds_force and (p("lds_exit_check") == "day" or cal.is_week_end(date)):
+        held_core = {a for a, e in (lds.get("exposures") or {}).items() if e > 0}
+        exit_due = any(diag.get(a, {}).get("trend") == "DOWN" for a in held_core)
+    if p("lds_crash") and len(adj["SPY"].dropna()) > 6 and float(adj["SPY"].iloc[-1] / adj["SPY"].iloc[-6] - 1) < -p("lds_crash") and not sw.get("active") and not lds.get("crash_out"):
+        vl = sleeve_value(st, "LDS", close); set_targets(st, "LDS", {"BIL": vl}, close, date, "LDS crash cut"); lds["crash_out"] = True
+    if lds.get("crash_out") and lds_review_due(cal, date): lds["crash_out"] = False
+    if (lds_review_due(cal, date) or lds_force or exit_due) and not swapped_back and not sw.get("active") and not lds.get("crash_out"):
         caps = implement(ex, kmax); vl = sleeve_value(st, "LDS", close)
         tg = lds_targets(caps, vl)
         cur = {t: sh * close[t] for t, sh in st["sleeves"]["LDS"]["holdings"].items()}
@@ -421,7 +456,8 @@ def _bullish(st, cal, date, tomorrow, adj):
         elif on and r > ex_th: on = False
         lds["dip_on"] = dip = on
     if p("swap_fomc") and P["fomc_swap"] and cal.is_fomc_window(tomorrow):
-        q = adj["QQQ"].dropna()
+        q = adj["QQQ"].dropna(); s_ = adj["SPY"].dropna()
+        if p("swap_fomc_dual") and not (float(s_.iloc[-30:].mean()) > float(s_.iloc[-210:].mean())): return False
         if not p("swap_fomc_trend") or float(q.iloc[-1]) > float(q.iloc[-200:].mean()): return True
     if p("swap_tom") and cal.is_tom(tomorrow): return True
     if p("swap_preholiday") and cal.is_pre_holiday(tomorrow): return True
