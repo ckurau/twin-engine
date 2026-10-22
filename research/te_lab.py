@@ -39,7 +39,8 @@ DEFAULTS = dict(growth=("TQQQ",), derisk_asset=None, def_trend=False, def_sma=20
                 def_invvol=False, lds_corr_cut=False, lds_idle=None, dual_fast=50,
                 dual_ema=False, tri_fast=None, dual_band=None, overlay_dual=False, lds_exit_check=None, core_strength=None,
                 nine_dual_cap=None, def_dual=False, lds_crash=None, dd_boost=None, swap_fomc_dual=False, q_gate=None, q_sell_skip_dual=False,
-                mom_skip1=False, dip_lev=None)
+                mom_skip1=False, dip_lev=None,
+                cap_sig=None, boost_sig=None, split_sig=None, tlt_carry=False, overlay_bear=False, chand=None, trend_params=None)
 LDS_MEM = {}      # per-run memory for hysteresis (reset by bt.run)
 LEV_OF = {t: (a, L) for (a, L), t in ETF.items()}
 
@@ -141,6 +142,113 @@ def dip_signal(adj, kind, th):
         hits.append(len(v) > 13 and all(v.iloc[-1 - j] >= 1.05 * float(v.iloc[-11 - j:-1 - j].mean()) for j in range(3)))
     return any(hits)
 
+def _col(adj, *names):
+    for n in names:
+        if n in adj and adj[n].notna().sum() > 30: return adj[n].dropna()
+    return None
+
+def _hlc(adj):
+    h, l, c = _col(adj, "QQQ_H"), _col(adj, "QQQ_L"), _col(adj, "QQQ_C")
+    if h is None or len(h) < 30: h, l, c = _col(adj, "NDX_H"), _col(adj, "NDX_L"), _col(adj, "NDX_C")
+    return h, l, c
+
+def sig(spec, adj, st, date, cal, tomorrow):
+    """True = favourable / risk-on, False = unfavourable / risk-off, None = no data (neutral)"""
+    name = spec[0]; a = spec[1:] if len(spec) > 1 else ()
+    q = adj["QQQ"].dropna(); mem = st.setdefault("sigmem", {})
+    def above(x, n=200): return bool(float(x.iloc[-1]) > float(x.iloc[-n:].mean())) if x is not None and len(x) >= n else None
+    if name == "fomc_even":
+        past = [d for d in te.FOMC_DATES if d <= tomorrow]
+        if not past: return None
+        w = (tomorrow - max(past)).days // 7; return w in (0, 2, 4, 6)
+    if name == "dist":
+        v = _col(adj, "QQQ_V") if _col(adj, "QQQ_V") is not None and len(_col(adj, "QQQ_V")) > 30 else _col(adj, "NDX_V")
+        if v is None or len(v) < 30 or float(v.iloc[-25:].min()) <= 0: return None
+        c = q.reindex(v.index).dropna(); r = c.pct_change(); dv = v.reindex(c.index).diff()
+        n = int(((r.iloc[-25:] < -0.002) & (dv.iloc[-25:] > 0)).sum()); return n < a[0]
+    if name == "vcp":
+        if len(q) < 260: return None
+        rr = q.pct_change(); near = float(q.iloc[-1]) >= 0.95 * float(q.iloc[-252:].max())
+        return bool(near and float(rr.iloc[-10:].std()) < a[0] * float(rr.iloc[-60:].std()))
+    if name == "holy":
+        h, l, c = _hlc(adj)
+        if c is None or len(c) < 210: return None
+        e20 = float(c.ewm(span=20).mean().iloc[-1])
+        return bool(float(c.iloc[-1]) > float(c.iloc[-50:].mean()) > float(c.iloc[-200:].mean()) and float(l.iloc[-1]) <= e20 * (1 + a[0]) and float(c.iloc[-1]) > e20)
+    if name == "willr":
+        h, l, c = _hlc(adj)
+        if c is None or len(c) < 210: return None
+        hh, ll = float(h.iloc[-10:].max()), float(l.iloc[-10:].min())
+        wr = -100 * (hh - float(c.iloc[-1])) / (hh - ll) if hh > ll else -50
+        return bool(wr < a[0] and float(c.iloc[-1]) > float(c.iloc[-200:].mean()))
+    if name == "dow":
+        x, y = above(_col(adj, "DJI")), above(_col(adj, "DJT"))
+        return None if x is None or y is None else bool(x and y)
+    if name == "cu_au":
+        c, g = _col(adj, "HG"), _col(adj, "GCF")
+        if c is None or g is None: return None
+        r = (c / g.reindex(c.index)).dropna(); return above(r)
+    if name == "usd_down":
+        x = above(_col(adj, "DXY")); return None if x is None else not x
+    if name == "easing":
+        x = _col(adj, "IRXL")
+        if x is None or len(x) < 130: return None
+        return bool(float(x.iloc[-1]) < float(x.iloc[-127]) - a[0])
+    if name == "small_lead":
+        return above((adj["IWM"] / adj["SPY"]).dropna())
+    if name == "semi_lead":
+        return above((adj["SOXX"] / adj["QQQ"]).dropna())
+    if name == "corr":
+        r = adj[["SPY", "QQQ", "IWM", "EEM"]].dropna().pct_change().iloc[-20:]
+        if len(r) < 20: return None
+        c = r.corr().values; m = (c.sum() - 4) / 12; return bool(m < a[0])
+    if name == "pres": return tomorrow.year % 4 == 3
+    if name == "qtr_end":
+        i = cal._pos.get(tomorrow)
+        if i is None: return None
+        return not any(i + k < len(cal.days) and (cal.days[i + k].month - 1) // 3 != (tomorrow.month - 1) // 3 for k in range(1, 6))
+    if name == "weekend": return not ((tomorrow - date).days > 1)
+    if name == "chand":
+        h, l, c = _hlc(adj)
+        if c is None or len(c) < 30: return None
+        k, n = a; tr = pd.concat([h - l, (h - c.shift()).abs(), (l - c.shift()).abs()], axis=1).max(axis=1)
+        atr = float(tr.iloc[-n:].mean()); hi = float(c.iloc[-n:].max()); off = mem.get("chand_off", False)
+        if not off and float(c.iloc[-1]) < hi - k * atr: off = True
+        elif off and float(c.iloc[-1]) >= hi: off = False
+        mem["chand_off"] = off; return not off
+    if name == "stage2":     # Weinstein: above a rising 150d (30-week) average
+        if len(q) < 175: return None
+        m = q.rolling(150).mean(); return bool(float(q.iloc[-1]) > float(m.iloc[-1]) > float(m.iloc[-21]))
+    if name == "template":   # Minervini trend template on QQQ
+        if len(q) < 225: return None
+        m50, m150, m200 = (float(q.iloc[-n:].mean()) for n in (50, 150, 200)); m200b = float(q.iloc[-221:-21].mean())
+        return bool(float(q.iloc[-1]) > m50 > m150 > m200 > m200b)
+    if name == "zweig4":     # Zweig 4% rule on weekly closes
+        if len(q) < 10: return None
+        on = mem.get("z4", True); lw = mem.get("z4w"); wk = date.isocalendar()[:2]
+        if lw is None: mem["z4w"] = wk; mem["z4c"] = float(q.iloc[-1]); return on
+        if wk != lw:
+            prev = float(q.iloc[-2]); ch = prev / mem["z4c"] - 1
+            if ch >= 0.04: on = True
+            elif ch <= -0.04: on = False
+            mem["z4"] = on; mem["z4w"] = wk; mem["z4c"] = prev
+        return on
+    if name == "rates_calm":
+        x = _col(adj, "TNX")
+        if x is None or len(x) < 130: return None
+        return bool(float(x.iloc[-1]) - float(x.iloc[-127]) < a[0])
+    if name == "djt": return above(_col(adj, "DJT"))
+    if name == "ichi":       # Ichimoku: close above the cloud
+        h, l, c = _hlc(adj)
+        if c is None or len(c) < 80: return None
+        mid = lambda n, k=0: (float(h.iloc[-n - k:len(h) - k].max()) + float(l.iloc[-n - k:len(l) - k].min())) / 2
+        sa = (mid(9, 26) + mid(26, 26)) / 2; sb = mid(52, 26); return bool(float(c.iloc[-1]) > max(sa, sb))
+    if name == "macd":       # weekly MACD above its signal line
+        w = q.resample("W-FRI").last().dropna()
+        if len(w) < 40: return None
+        m = w.ewm(span=12).mean() - w.ewm(span=26).mean(); return bool(float(m.iloc[-1]) > float(m.ewm(span=9).mean().iloc[-1]))
+    raise ValueError(name)
+
 def uptrend_pre(q): return float(q.iloc[-1]) > float(q.iloc[-200:].mean())
 
 def rsi2(s):
@@ -160,6 +268,18 @@ def lds_exposures(adj):
         diag[a] = dict(price=float(s.iloc[-1]), sma=sma, trend="UP" if up else "DOWN", vol63=v, mom_blend=float(bm))
         m12 = _mom(s, 12)
         if p("core_trend") == "or_mom": up = up or (m12 == m12 and m12 > 0)
+        elif p("core_trend") in ("donchian", "breakout", "kaufman"):
+            tp = p("trend_params") or ()
+            if p("core_trend") == "donchian":
+                n_ = tp[0]; up = float(s.iloc[-1]) > (float(s.iloc[-n_:].max()) + float(s.iloc[-n_:].min())) / 2
+            elif p("core_trend") == "breakout":
+                ein, eout = tp; was = LDS_MEM.get(a, float(s.iloc[-1]) >= sma)
+                if not was and float(s.iloc[-1]) >= float(s.iloc[-ein:].max()): was = True
+                elif was and float(s.iloc[-1]) <= float(s.iloc[-eout:].min()): was = False
+                LDS_MEM[a] = was; up = was
+            else:
+                n_, th = tp; ch = abs(float(s.iloc[-1] - s.iloc[-n_])); path = float(s.diff().abs().iloc[-n_:].sum())
+                up = up and float(s.iloc[-30:].mean()) > sma and (ch / path if path else 0) > th
         elif p("core_trend") == "dual":
             f_ = float(s.iloc[-p("dual_fast"):].ewm(span=p("dual_fast")).mean().iloc[-1]) if p("dual_ema") else float(s.iloc[-p("dual_fast"):].mean())
             if p("dual_band"):
@@ -169,6 +289,9 @@ def lds_exposures(adj):
             else: up = up and f_ > sma
             if p("tri_fast"): up = up and float(s.iloc[-p("tri_fast"):].mean()) > f_
             diag[a]["fast_ratio"] = f_ / sma - 1
+        if p("tlt_carry") and a == "TLT" and "TNX" in adj and "IRXL" in adj:
+            tn, ir = adj["TNX"].iloc[-1], adj["IRXL"].iloc[-1]
+            if tn == tn and ir == ir and float(tn) - float(ir) <= 0: up = False
         if p("lds_corr_cut") and a == "TLT" and "SPY" in px:
             c = float(np.corrcoef(r["SPY"].iloc[-63:], r["TLT"].iloc[-63:])[0, 1])
             if c > 0: up = False
@@ -193,6 +316,7 @@ def lds_exposures(adj):
         bm = diag[a]["mom_blend"]
         if np.isnan(bm): continue
         if bm <= 0 and (p("overlay_long_only") or not any(L < 0 for L in LEVS[a])): continue
+        if p("overlay_bear") and "SPY" in px and len(px["SPY"]) > 505 and float(px["SPY"].iloc[-1] / px["SPY"].iloc[-505] - 1) < 0: continue
         sgn = (1 if bm > 0 else -1)
         if p("overlay_dual"): sgn = 1 if diag[a]["trend"] == "UP" else -1
         ov[a] = sgn / diag[a]["vol63"]
@@ -287,6 +411,13 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
     if p("rebal_band") is not None and st["last_date"] and cal.is_month_end(date):
         sh = sleeve_value(st, "9SIG", close) / total_value(st, close)
         if abs(sh - P["split_9sig"]) > p("rebal_band"): rebal = True
+    if p("split_sig") and st["last_date"]:
+        spec, on_, off_ = p("split_sig"); ok = sig(spec, adj, st, date, cal, cal.next_day(date))
+        want = P["split_9sig"] if ok is None else (on_ if ok else off_)
+        if rebal: split = want
+        elif cal.is_month_end(date):
+            sh = sleeve_value(st, "9SIG", close) / total_value(st, close)
+            if abs(sh - want) > 0.05: rebal = True; split = want
     if p("regime_split") and st["last_date"]:
         q_ = adj["QQQ"].dropna(); want = p("regime_split")[0] if float(q_.iloc[-1]) > float(q_.iloc[-200:].mean()) else p("regime_split")[1]
         if rebal: split = want
@@ -361,8 +492,11 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
         elif not on and uptrend and r2 < p("nine_dip"): on = True
         elif on and r2 > p("nine_dip_exit"): on = False
         nine["dip_on"] = on; full = full or on
+    if p("boost_sig") and sig(p("boost_sig"), adj, st, date, cal, tomorrow) is True: full = True
+    if p("chand") and sig(("chand",) + tuple(p("chand")), adj, st, date, cal, tomorrow) is False: base = 0.0; full = False
     w_new = 1.0 if full else base
     if roff: w_new = min(base, p("nine_cap")[1])
+    if p("cap_sig") and sig(p("cap_sig")[0], adj, st, date, cal, tomorrow) is False: w_new = min(w_new, p("cap_sig")[1])
     def_new = deff
     if p("def_trend"):
         def_new = [t for t in deff if float(adj[t].iloc[-1]) >= float(adj[t].iloc[-p("def_sma"):].mean())] or ["BIL"]

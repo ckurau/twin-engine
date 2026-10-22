@@ -17,6 +17,14 @@ for _c, _src in [("VIX3M", _X["^VIX3M"]), ("VVIX", _X["^VVIX"]), ("VWEHX", _X["V
                  ("QQQ_H", _X["QQQ_H"]), ("QQQ_L", _X["QQQ_L"]), ("QQQ_C", _X["QQQ_C"])]:
     PANEL[_c] = _src.ffill() if not _c.startswith("QQQ_") else _src      # signals only, never traded
 PANEL["RF"] = pd.read_pickle(os.path.join(HERE, "data", "rf.pkl")).reindex(PANEL.index).fillna(0.0)   # daily T-bill return (cash yield)
+
+def add_signal_cols(px):
+    """round 10 signal series (never traded)"""
+    x3 = pd.read_pickle(os.path.join(HERE, "data", "extra3.pkl")).reindex(px.index)
+    for c, src in [("DJT", "^DJT"), ("DJI", "^DJI"), ("HG", "HG=F"), ("GCF", "GC=F"), ("DXY", "DX-Y.NYB"), ("TNX", "^TNX"), ("IRXL", "^IRX")]: px[c] = x3[src].ffill(limit=5)
+    for c, src in [("QQQ_V", "QQQ_V"), ("NDX_V", "^NDX_V"), ("NDX_H", "^NDX_H"), ("NDX_L", "^NDX_L"), ("NDX_C", "^NDX_C")]: px[c] = x3[src]
+    return px
+PANEL = add_signal_cols(PANEL)
 WIN = 300                                     # history rows each step needs (210d SMA, 12m momentum, 63d cov)
 _BASE_P = dict(te.P)
 
