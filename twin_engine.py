@@ -438,8 +438,11 @@ def step(st, date, adj: pd.DataFrame, close: dict, cal: Calendar, divs: dict | N
         turn = sum(abs(tg.get(t, 0) - cur.get(t, 0)) for t in set(tg) | set(cur))
         lds["last_turnover"] = turn / vl if vl else 0.0
         if turn > P["lds_threshold"] * vl or lds_force or rule_change:
+            n_before = len(st["trades"])
             set_targets(st, "LDS", tg, close, date, "Initial allocation" if lds_force else (f"LDS rebalance: v{VERSION[:3]} rule change" if rule_change else "LDS monthly rebalance"))
-            lds["exposures"] = ex; lds["last_rebalance"] = str(date.date()); ev.append(f"LDS rebalanced (turnover {turn / vl:.0%})")
+            traded = len(st["trades"]) > n_before
+            lds["exposures"] = ex; lds["last_rebalance"] = str(date.date()); ev.append(f"LDS rebalanced (turnover {turn / vl:.0%})" if traded else
+                      (f"LDS switched to the v{VERSION[:3]} rules: no trades needed (holdings already match)" if rule_change else f"LDS checked: change of {turn / vl:.1%} needed no trades"))
         else:
             ev.append(f"LDS monthly check: turnover {turn / vl:.1%} < 5%, no trade")
         lds["last_check"] = str(date.date()); lds["target_exposures"] = ex; lds["assets"] = list(P["lds_assets"]); lds["rules"] = rules_now
