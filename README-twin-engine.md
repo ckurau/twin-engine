@@ -12,69 +12,71 @@
 
 Two independent "engines" share one account and are reset to 50/50 at each year end.
 **Engine 1 – Modified 9Sig** holds TQQQ in a *growth* sub-sleeve and TLT + GLD in a *defensive* reserve. Every quarter the growth sub-sleeve must grow 9%: excess is sold into the reserve, shortfalls are bought from it. Inside the growth sub-sleeve a **volatility switch** shrinks TQQQ when Nasdaq volatility spikes, a **turn-of-month (TOM)** rule holds full TQQQ around month-end, and a **dip boost** holds full TQQQ for a session after a sharp short-term drop in an uptrend.
-**Engine 2 – LDS** checks the S&P 500, long Treasuries and gold at each month-end close (v1.6: no Nasdaq-100, which Engine 1 already holds); it holds the ones above their 210-day average, sized by inverse volatility and levered up with 3x/2x ETFs (UPRO, TMF, UGL), plus a small long/short momentum overlay (can use SPXU, TMV, GLL). On each scheduled **Fed decision day** (8 a year) the whole LDS sleeve is held in SOXL (3x semiconductors) for that one day.
+**Engine 2 – LDS** checks the S&P 500, long Treasuries and gold at each month-end close (v1.6: no Nasdaq-100, which Engine 1 already holds); it holds the ones above their 210-day average whose 30-day average is also above it (v1.7), sized by inverse volatility and levered up with 3x/2x ETFs (UPRO, TMF, UGL), plus a small long/short momentum overlay (can use SPXU, TMV, GLL). On each scheduled **Fed decision day** (8 a year) the whole LDS sleeve is held in SOXL (3x semiconductors) for that one day.
 
-### Expected behaviour (backtest of v1.6.0, $20k start, no deposits)
+### Expected behaviour (backtest of v1.7.0, $20k start, no deposits)
 
-The same numbers, plus a growth chart and calendar years, are on the dashboard's **Backtest** tab (from `backtest.json`; regenerate with `research\backtest_export.py` after any rule change).
+The same numbers, plus a growth chart, trading metrics and calendar years, are on the dashboard's **Research** tab (from `backtest.json`; regenerate with `research\backtest_export.py` after any rule change).
 
 | Scenario | $20k became | CAGR | Max drawdown |
 |---|---|---|---|
-| 2000-2026 | $78.0M | 36.2% | −37.4% |
-| 2007-2026 (fresh start) | $18.2M | 41.1% | −35.2% |
-| 2010-2026 (real ETFs only) | $3.3M | 36.1% | −35.2% |
-| 2000-2026, double trading costs | $56.8M | 34.6% | −38.6% |
-| SPY, 2000-2026 | $169k | 8.3% | −55.2% |
+| 2000-2026 | $114.5M | 38.1% | −36.4% |
+| 2007-2026 (fresh start) | $25.6M | 43.5% | −32.8% |
+| 2010-2026 (real ETFs only) | $4.8M | 39.1% | −32.8% |
+| 2000-2026, double trading costs | $83.8M | 36.5% | −37.6% |
+| SPY, 2000-2026 | $170k | 8.3% | −55.2% |
 
-Before 2010 the leveraged ETFs are rebuilt from their indexes (calibrated to the real funds); from March 2010 every ETF is the real fund, so **2010–2026 is the most honest row**. Ten-year windows (starts 2000–2016): worst 27.8%, median 37.2%, best 45.9% CAGR. Ulcer index 12.1, Martin ratio 2.98.
+Before 2010 the leveraged ETFs are rebuilt from their indexes (calibrated to the real funds); from March 2010 every ETF is the real fund, so **2010–2026 is the most honest row**. Ten-year windows (starts 2000–2016): worst 31.3%, median 37.8%, best 45.9% CAGR. Ulcer index 11.6, Martin ratio 3.29. Worst 5% of 12-month periods: -8.9%.
 
 **Through the crashes** (worst drop inside the period / start to end, vs SPY start to end):
 
 | Period | Worst drop | Start → end | SPY |
 |---|---|---|---|
-| Dot-com crash | −37.4% | −4.8% | −47.5% |
-| 2008 financial crisis | −26.8% | +58.4% | −55.2% |
-| Q4 2018 | −32.7% | −32.6% | −19.3% |
+| Dot-com crash | −36.4% | +4.0% | −47.5% |
+| 2008 financial crisis | −25.9% | +50.0% | −55.2% |
+| Q4 2018 | −27.7% | −27.7% | −19.3% |
 | Covid crash | −24.3% | −12.5% | −33.7% |
-| 2022 bear market | −34.6% | −30.4% | −18.1% |
+| 2022 bear market | −31.3% | −23.6% | −18.1% |
 
-How a leveraged strategy fell less than SPY in 2000–02 and 2008: the volatility switch shrinks TQQQ as markets get choppy, and LDS only holds assets above their 210-day average, so in long bear markets the account drifts into Treasuries and gold. **2022 and Q4 2018 were worse than SPY**: stocks and bonds fell together, so there was nowhere to hide. A one-day crash like Oct 19, 1987 (S&P -20.5%, Nasdaq -20%, semiconductors -25%, Treasuries +2% in one day (like Oct 19, 1987)) applied to every day's holdings: typical loss -35%, 1 day in 10 -51%, worst -71%.
+How a leveraged strategy fell less than SPY in 2000–02 and 2008: the volatility switch shrinks TQQQ as markets get choppy, and LDS only holds assets in a confirmed uptrend, so in long bear markets the account drifts into Treasuries and gold. **2022 and Q4 2018 were worse than SPY**: stocks and bonds fell together. A one-day crash like Oct 19, 1987 (S&P -20.5%, Nasdaq -20%, semiconductors -25%, Treasuries +2% in one day (like Oct 19, 1987)) applied to every day's holdings: typical loss -35%, 1 day in 10 -52%, worst -71%.
 
-**Realistic live expectation:** ~20–30%/yr, and a 40–50% drop at some point is likely. The backtest's −37% is one historical path, not a floor.
+**Realistic live expectation:** ~20–30%/yr, and a 40–50% drop at some point is likely. The backtest's drawdown is one historical path, not a floor.
 
-### 25-year projection (v1.6.0, $20,000 start + $200/month)
+### 25-year projection (v1.7.0, $20,000 start + $200/month)
 
-Monte Carlo: 20,000 paths that resample real 12-month blocks of the v1.6.0 backtest's monthly returns (2000–2026, 0.05% per fill). **Realistic** = backtest returns minus 8 points a year (edge decay, real-world fills). **Conservative** = minus 15 points. Balances at each anniversary, before inflation.
+Monte Carlo: 20,000 paths that resample real 12-month blocks of the v1.7.0 backtest's monthly returns (2000–2026, 0.05% per fill). **Realistic** = backtest returns minus 8 points a year (edge decay, real-world fills). **Conservative** = minus 15 points. Balances at each anniversary, before inflation.
 
 | Year | Ending | Put in | Realistic median | 10th – 90th percentile | Conservative median |
 |---|---|---|---|---|---|
-| 1 | Oct 2027 | $22,400 | $28k | $20k – $39k | $27k |
-| 2 | Oct 2028 | $24,800 | $38k | $25k – $63k | $35k |
-| 3 | Oct 2029 | $27,200 | $52k | $31k – $93k | $45k |
-| 4 | Oct 2030 | $29,600 | $69k | $38k – $135k | $57k |
-| 5 | Oct 2031 | $32,000 | $91k | $47k – $193k | $71k |
-| 6 | Oct 2032 | $34,400 | $120k | $57k – $272k | $89k |
-| 7 | Oct 2033 | $36,800 | $157k | $70k – $378k | $111k |
-| 8 | Oct 2034 | $39,200 | $204k | $87k – $526k | $137k |
-| 9 | Oct 2035 | $41,600 | $262k | $106k – $725k | $168k |
-| 10 | Oct 2036 | $44,000 | $338k | $131k – $977k | $206k |
-| 11 | Oct 2037 | $46,400 | $437k | $160k – $1.3M | $252k |
-| 12 | Oct 2038 | $48,800 | $559k | $195k – $1.8M | $307k |
-| 13 | Oct 2039 | $51,200 | $722k | $238k – $2.4M | $378k |
-| 14 | Oct 2040 | $53,600 | $922k | $292k – $3.3M | $457k |
-| 15 | Oct 2041 | $56,000 | $1.2M | $359k – $4.4M | $559k |
-| 16 | Oct 2042 | $58,400 | $1.5M | $440k – $5.9M | $675k |
-| 17 | Oct 2043 | $60,800 | $2.0M | $542k – $7.9M | $832k |
-| 18 | Oct 2044 | $63,200 | $2.5M | $651k – $10.5M | $1.0M |
-| 19 | Oct 2045 | $65,600 | $3.2M | $799k – $14.2M | $1.2M |
-| 20 | Oct 2046 | $68,000 | $4.1M | $997k – $18.9M | $1.5M |
-| 21 | Oct 2047 | $70,400 | $5.3M | $1.2M – $25.5M | $1.8M |
-| 22 | Oct 2048 | $72,800 | $6.8M | $1.5M – $33.8M | $2.2M |
-| 23 | Oct 2049 | $75,200 | $8.7M | $1.8M – $45.2M | $2.6M |
-| 24 | Oct 2050 | $77,600 | $11.1M | $2.3M – $59.9M | $3.2M |
-| 25 | Oct 2051 | $80,000 | $14.1M | $2.8M – $80.2M | $3.8M |
+| 1 | Oct 2027 | $22,400 | $29k | $21k – $40k | $27k |
+| 2 | Oct 2028 | $24,800 | $40k | $26k – $64k | $36k |
+| 3 | Oct 2029 | $27,200 | $54k | $32k – $96k | $47k |
+| 4 | Oct 2030 | $29,600 | $73k | $41k – $142k | $60k |
+| 5 | Oct 2031 | $32,000 | $98k | $51k – $205k | $77k |
+| 6 | Oct 2032 | $34,400 | $131k | $63k – $292k | $98k |
+| 7 | Oct 2033 | $36,800 | $174k | $79k – $413k | $123k |
+| 8 | Oct 2034 | $39,200 | $229k | $98k – $578k | $154k |
+| 9 | Oct 2035 | $41,600 | $298k | $122k – $808k | $191k |
+| 10 | Oct 2036 | $44,000 | $392k | $153k – $1.1M | $239k |
+| 11 | Oct 2037 | $46,400 | $514k | $189k – $1.5M | $298k |
+| 12 | Oct 2038 | $48,800 | $667k | $236k – $2.1M | $367k |
+| 13 | Oct 2039 | $51,200 | $875k | $293k – $2.9M | $458k |
+| 14 | Oct 2040 | $53,600 | $1.1M | $362k – $3.9M | $567k |
+| 15 | Oct 2041 | $56,000 | $1.5M | $454k – $5.4M | $700k |
+| 16 | Oct 2042 | $58,400 | $1.9M | $568k – $7.4M | $863k |
+| 17 | Oct 2043 | $60,800 | $2.5M | $710k – $10.0M | $1.1M |
+| 18 | Oct 2044 | $63,200 | $3.3M | $867k – $13.5M | $1.3M |
+| 19 | Oct 2045 | $65,600 | $4.3M | $1.1M – $18.4M | $1.6M |
+| 20 | Oct 2046 | $68,000 | $5.6M | $1.4M – $24.8M | $2.0M |
+| 21 | Oct 2047 | $70,400 | $7.3M | $1.7M – $33.3M | $2.5M |
+| 22 | Oct 2048 | $72,800 | $9.6M | $2.1M – $45.7M | $3.1M |
+| 23 | Oct 2049 | $75,200 | $12.3M | $2.7M – $62.6M | $3.8M |
+| 24 | Oct 2050 | $77,600 | $15.9M | $3.4M – $83.9M | $4.6M |
+| 25 | Oct 2051 | $80,000 | $20.7M | $4.2M – $112.2M | $5.7M |
 
-In the realistic case 12% of paths fall more than 50% at some point (typical worst drop -40%). This is a range, not a promise.
+In the realistic case 5% of paths fall more than 50% at some point (typical worst drop -37%). This is a range, not a promise.
+
+**Round 8 (Oct 21, 2026), 93 ideas aimed at 40% CAGR:** only the LDS "dual trend" passed every stress test (better CAGR and drawdown from 2000, 2003, 2007, 2010 and at double costs; >50%-drop odds in the 20-year simulation 9% → 4%); adopted as v1.7. Its gain comes after 2013 (2000–12: −0.7 pt). Rejected: Santa Claus rally (depends on the exact start date), fear premium (fragile), high-low / downside volatility, regime splits, mid-quarter 9Sig trades, weekly reversals, switch floors; 60/40 on top of v1.7 adds ~2% more money for double the >50%-drop odds.
 
 **Tech-reliance check (Oct 21, 2026):** mixing non-tech 3x ETFs into 9Sig's growth engine (UPRO, UDOW, TNA, CURE, FAS, ERX) was worse when the volatility switch read the mix (2000–02 crash −28% to −63% vs −4.8%: TQQQ's volatility is the early warning). Keeping the switch on TQQQ while holding a mix costs 1.5–3 pts a year (TQQQ 75/UPRO 25: 34.8%; 50/50: 33.3%) for a similar drawdown, but halves Nasdaq concentration; its payoff would come only in a slow, crash-free tech slump the history doesn't contain. **Decision: keep v1.6 (TQQQ only).**
 
@@ -105,7 +107,7 @@ All signals use **closing prices**. In paper trading all orders fill at that day
 | Dip boost (v1.5) | If QQQ's **2-day RSI closes below 20** while QQQ is **above its 200-day average**, hold TQQQ at 100% of S for the next session (re-checked every close). Only matters when the switch is below 100% |
 
 ### 2.3 Engine 2 — LDS (checked at the close of the last trading day of each month; v1.3: each week)
-1. **Trend:** for SPY, TLT, GLD (v1.6; v1.5 also QQQ) — is today's close ≥ its 210-day simple average?
+1. **Trend:** for SPY, TLT, GLD (v1.6; v1.5 also QQQ) — is today's close ≥ its 210-day simple average **and** its 30-day average above the 210-day average (v1.7 dual trend)?
 2. **Core (85%)**: uptrend assets get weight ∝ 1 / (63-day volatility). Scale the mix so its expected volatility = 100%/yr; the scale is capped by the leverage that exists (see step 4), so in practice it means "as much leverage as the ETFs allow."
 3. **Overlay (15%)**: each asset long if the average of its 1-, 3-, 6- and 12-month returns > 0, short if < 0; weight ∝ 1/vol, scaled to 15% vol.
 4. **Implement** combined exposures with the lowest common leverage tier that fits in 100% of the sleeve: 1x (SPY, QQQ, TLT, GLD) → 2x (SSO, QLD, UBT, UGL) → 3x (UPRO, TQQQ, TMF; gold max 2x UGL). Shorts use inverse ETFs (SH/SDS/SPXU, PSQ/QID/SQQQ, TBF/TBT/TMV, GLL). If even max leverage doesn't fit, everything is scaled down.
@@ -265,7 +267,7 @@ Broker setup at Schwab: register an app at developer.schwab.com ("Accounts and T
 | Down 40–55% | Painful but inside the expected range. Keep following the orders. |
 | Down 55–65% (deeper than the backtest ever went) | Review with Claude: is a data feed, ETF or rule broken? Keep following the orders meanwhile. |
 | Down more than 65% | Pause new contributions and decide calmly whether to continue. Positions keep following the rules until you decide. |
-| Last 12 months below −11.4% (the backtest's worst 5%) | Review; a bad year alone is not a reason to quit. |
+| Last 12 months below −8.9% (the backtest's worst 5%) | Review; a bad year alone is not a reason to quit. |
 | After 3+ years: CAGR more than 10 pts below SPY, or under 5% a year | The edge may be gone: consider moving to a plain index fund. |
 | An ETF stops trading (closure) | The Health tab names the replacement (`SUBSTITUTES` in `twin_engine.py`); ask Claude to switch. Nothing switches automatically. |
 | Real account differs from the paper account | Automatic: from go-live (`GO_LIVE_DATE`), any preview-vs-close difference is added to the next preview as a correction order. |
@@ -362,6 +364,7 @@ python twin_engine.py validate [--years 3]
 |---|---|---|
 | 1.0 | Oct 2026 | Initial paper-trading release: 50/50 Twin Engine + TOM. Engine replay matches backtest (33.9% vs 35.0% CAGR, −48.4% vs −48.4% max DD, 2007–2026) |
 | 1.1 | Oct 2026 | Volatility switch target raised 70% → 80% (larger TQQQ position in the 9Sig sleeve). Walk-forward out of sample: 35.1% vs 34.7% CAGR, −51.5% vs −53.3% max DD. Across 18 start years (2000–2017, 10-year windows): higher CAGR in 16, shallower drawdown in 13. Weaker for starts from 2013 on (drawdowns ~2–3 points deeper in 2022). Replay 2007–26: 36.4% CAGR, −44.1% max DD |
+| 1.7.0 | Oct 21, 2026 | LDS **dual trend**: a core asset also needs its 30-day average above its 210-day average, so LDS skips assets that are still above the long average but already rolling over. 2000–26 38.1% / −36.4% (v1.6 36.2% / −37.4%); 2010–26 39.1% / −32.8% (36.2% / −35.2%); double costs 36.5%; worst 10-year CAGR 31.3% (27.8%); >50%-drop odds 9% → 4%. Round 8 tested 93 ideas; one-time LDS rebalance at the next close |
 | 1.6.0 | Oct 19, 2026 | LDS drops QQQ (assets SPY, TLT, GLD): Engine 1 already holds the Nasdaq, so both engines no longer stack TQQQ. Same or higher CAGR with a 1.7–4.8 pt smaller max drawdown in every scenario tested (2000–26 36.2% / −37.4%; 2010–26 real ETFs 36.1% / −35.2% vs 36.0% / −40.0%). Nasdaq share of stock exposure 78% → 68%; days with Nasdaq exposure above 2x the account 12% → 2%. Idea Lab IV |
 | 1.5.0 | Oct 19, 2026 | Idea Lab III (155 ideas, production engine over 1998–2026): three changes adopted together: (1) Fed-day swap into **SOXL** instead of TQQQ, (2) LDS review **monthly** instead of weekly (~15 fewer trade days a year), (3) 9Sig **dip boost** (QQQ 2-day RSI < 20 in an uptrend → full TQQQ next session). 35.2% / −40% vs 30.6% / −52% for v1.3 on the same data (2000–26); 2010–26 with real ETFs 36.0% / −40% vs 34.0% / −39%. Passed: double costs, fresh starts 2003/2007/2010, 15 of 17 ten-year windows, both halves, and a 2000–12 walk-forward pick. On-time job triggers via cron-job.org |
 | 1.4.0 | Oct 2026 | Runs in the cloud. New `preview` command: ~45 min before the close it runs today's close through the exact rules on a copy of the account using live prices and lists the market-on-close orders (net per ticker, whole shares); never changes the ledger. Checked against real closes: identical orders on a new account, a normal day, a Fed-day swap in/out and a 1:00 PM early close. GitHub Actions workflows replace Task Scheduler / `run_daily.bat` (preview, daily run, start account, validate; DST and early closes handled via the NYSE calendar). Dashboard: **Place before the close** card. Price download retries when Yahoo throttles |

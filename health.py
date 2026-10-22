@@ -224,8 +224,9 @@ def c_state():
             "Ask Claude: the swap should have ended at that close." if stuck else "")
     else:
         add("Account", "Fed-day swap", "ok", "No swap open.")
-    if state["lds"].get("assets") and state["lds"]["assets"] != list(te.P["lds_assets"]):
-        add("Account", "LDS rules applied", "warn", f"LDS still holds the old asset list {state['lds']['assets']}; it switches at the next close.")
+    want = list(te.P["lds_assets"]) + [f"fast{te.P['lds_fast_sma']}"]
+    if state["lds"].get("rules", state["lds"].get("assets")) and state["lds"].get("rules") != want:
+        add("Account", "LDS rules applied", "info", f"LDS switches to the v{te.VERSION} rules at the next close (one-time rebalance).")
     eq = pd.to_datetime([e["date"] for e in state["equity"]])
     sess = pd.DatetimeIndex(CAL.sessions_in_range(eq[0], pd.Timestamp(state["last_date"]))).tz_localize(None)
     gaps = sess.difference(eq)

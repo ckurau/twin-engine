@@ -316,7 +316,7 @@ function previewCard(){
 }
 
 /* ---------------- before the first run ---------------- */
-const DEFAULT_PARAMS = {lds_assets: ["SPY", "TLT", "GLD"], fomc_swap: true, fomc_asset: "SOXL", lds_review: "month", dip_rsi2: 20, split_9sig: .5, sig_rate: .09, vol_target: .8, vol_power: 10, vol_band: .05, vol_lookback: 20, tom_after: 3, sma_days: 210, lds_core: .85, lds_overlay: .15, lds_threshold: .05, slippage_bps: 2};
+const DEFAULT_PARAMS = {lds_fast_sma: 30, lds_assets: ["SPY", "TLT", "GLD"], fomc_swap: true, fomc_asset: "SOXL", lds_review: "month", dip_rsi2: 20, split_9sig: .5, sig_rate: .09, vol_target: .8, vol_power: 10, vol_band: .05, vol_lookback: 20, tom_after: 3, sma_days: 210, lds_core: .85, lds_overlay: .15, lds_threshold: .05, slippage_bps: 2};
 function nextCloseLabel(){
   const now = new Date(), et = new Date(now.toLocaleString("en-US", {timeZone: "America/New_York"}));
   const d = new Date(et); const afterClose = et.getHours() > 16 || (et.getHours() === 16 && et.getMinutes() >= 15);
@@ -596,7 +596,7 @@ function renderSignals(){
     const d = a.pct_vs_sma * 100, pos = 50 + Math.max(-45, Math.min(45, d / 20 * 45)), ex = l.exposures[a.sym] || 0;
     return `<div class="asset"><div><div class="sym">${a.sym}</div><span class="pill ${a.trend === "UP" ? "up" : "dn"}" style="margin-top:4px">${a.trend === "UP" ? "▲ Up" : "▼ Down"}</span></div>
       <div style="min-width:0"><div class="track"><span class="mid"></span><span class="mk" style="left:${pos}%;background:${a.trend === "UP" ? "var(--up)" : "var(--dn)"}"></span></div>
-        <div class="sub"><span>${pct(d)} vs 210-day avg ${px(a.sma)}</span><span>Momentum ${pct(a.mom_blend * 100)} · overlay ${a.overlay === "LONG" ? "long" : "short"}</span></div></div>
+        <div class="sub"><span>${pct(d)} vs 210-day avg ${px(a.sma)}${a.fast_vs_sma != null ? " · 30-day avg " + pct(a.fast_vs_sma * 100) + " vs it" : ""}</span><span>Momentum ${pct(a.mom_blend * 100)} · overlay ${a.overlay === "LONG" ? "long" : "short"}</span></div></div>
       <div class="num" style="text-align:right"><div style="font-weight:600">${ex >= 0 ? "" : "−"}${Math.abs(ex).toFixed(2)}x</div><div class="muted" style="font-size:11px">exposure</div></div></div>`;
   }).join("");
   $("#signals").innerHTML = `
@@ -636,7 +636,7 @@ function renderSignals(){
 
   <div class="card"><div class="h2"><span class="pill e2"><span class="dot"></span>Engine 2</span>LDS trend board <span class="r muted">next review ${dlong(l.next_review)}</span></div>
     <div>${assets}</div>
-    <div class="muted" style="font-size:12.5px;margin-top:10px">Marker shows price vs its 210-day average (center line, ±20% scale). Assets above the line are held in the levered core; momentum sets the small long/short overlay. Exposure = effective multiple of the LDS sleeve actually held.</div>
+    <div class="muted" style="font-size:12.5px;margin-top:10px">Marker shows price vs its 210-day average (center line, ±20% scale). An asset is held in the leveraged core only when its price is above the line <b>and</b> its 30-day average is above the line too (v1.7). Momentum sets the small long/short overlay. Exposure = effective multiple of the LDS sleeve actually held.</div>
   </div>`;
 }
 
@@ -659,7 +659,7 @@ function renderStrategy(){
     <h3><span style="color:var(--e2)">Engine 2</span> · Leveraged Diversification (LDS)</h3>
     <ul>
       <li><b>Checked at the close of the last trading day of each month</b> using SPY, TLT and GLD (v1.6: no QQQ, because Engine 1 already holds the Nasdaq).</li>
-      <li><b>Core (85%):</b> assets closing above their 210-day average, weighted by 1 ÷ 63-day volatility, scaled up to the most leverage the ETFs allow (3x for stocks and Treasuries, 2x for gold): UPRO, TMF, UGL.</li>
+      <li><b>Core (85%):</b> assets closing above their 210-day average <b>whose 30-day average is also above the 210-day</b> (v1.7 dual trend), weighted by 1 ÷ 63-day volatility, scaled up to the most leverage the ETFs allow (3x for stocks and Treasuries, 2x for gold): UPRO, TMF, UGL.</li>
       <li><b>Overlay (15%):</b> long if the average of 1, 3, 6 and 12-month returns is positive, short (inverse ETF) if negative; sized to 15% volatility. Inverse ETFs: SPXU, TMV, GLL.</li>
       <li><b>Trade only if</b> the total change is more than 5% of the sleeve.</li>
       <li><b>Fed-day swap:</b> at the close of the trading day before each scheduled Fed (FOMC) decision, sell the whole LDS sleeve and buy SOXL (3x semiconductors). At the close of decision day, sell the SOXL and buy back the normal LDS positions. 8 times a year.</li>
@@ -688,6 +688,7 @@ function renderStrategy(){
       <tr><td>50/50 reset</td><td>year end</td></tr>
       <tr><td>Fed-day swap</td><td>${P.fomc_swap === false ? "off" : "on, into " + (P.fomc_asset || "SOXL")}</td></tr>
       <tr><td>LDS review</td><td>${P.lds_review === "week" ? "weekly" : "monthly"}</td></tr>
+      <tr><td>LDS trend</td><td>${P.lds_fast_sma ? "above 210-day avg + " + P.lds_fast_sma + "-day avg above it" : "above 210-day avg"}</td></tr>
       <tr><td>Dip boost (QQQ 2-day RSI)</td><td>${P.dip_rsi2 == null ? "off" : "below " + P.dip_rsi2}</td></tr>
       <tr><td>Slippage per fill</td><td>${P.slippage_bps} bp</td></tr>
       <tr><td>Monthly contribution</td><td>${money(D.meta.contrib_monthly, 0)}</td></tr>
@@ -774,14 +775,15 @@ function renderBacktest(){
     <li>Generated ${esc(BT.meta.generated)}. Every rule change is re-tested and this tab is refreshed.</li></ul></div>
 
   <div class="card"><div class="h2">Idea Lab <span class="r"><a href="idealab.html" style="color:var(--e1)">Open the full Idea Lab →</a></span></div>
-    <div class="fg2" style="font-size:14px;margin-bottom:10px">About 330 ideas have been tested with the same engine code: famous traders' rules, quant-fund research, calendar effects, extra assets, hedges and leverage. Only these changes survived the robustness tests (other start dates, double costs, ten-year windows, walk-forward):</div>
+    <div class="fg2" style="font-size:14px;margin-bottom:10px">About 440 ideas have been tested with the same engine code: famous traders' rules, quant-fund research, calendar effects, extra assets, hedges and leverage. Only these changes survived the robustness tests (other start dates, double costs, ten-year windows, walk-forward):</div>
     <div class="tblwrap"><table><thead><tr><th>Version</th><th>Change</th><th>Why</th></tr></thead><tbody>
       <tr><td>1.1</td><td style="font-family:var(--f-body);white-space:normal">Volatility switch target 70% → 80%</td><td style="font-family:var(--f-body);white-space:normal">Higher CAGR in all 17 ten-year windows</td></tr>
       <tr><td>1.3</td><td style="font-family:var(--f-body);white-space:normal">Fed-day swap; 50/50 reset once a year</td><td style="font-family:var(--f-body);white-space:normal">+1.4 pts CAGR, drawdown about 7 pts smaller</td></tr>
       <tr><td>1.5</td><td style="font-family:var(--f-body);white-space:normal">Fed swap into SOXL; LDS monthly; 9Sig dip boost</td><td style="font-family:var(--f-body);white-space:normal">About +2 pts a year with real ETFs (2010+); 15 fewer trade days</td></tr>
       <tr><td>1.6</td><td style="font-family:var(--f-body);white-space:normal">LDS drops QQQ (SPY, TLT, GLD)</td><td style="font-family:var(--f-body);white-space:normal">Same CAGR, 2–5 pts smaller drawdown, less Nasdaq stacking</td></tr>
+      <tr><td>1.7</td><td style="font-family:var(--f-body);white-space:normal">LDS dual trend: 30-day average must also be above the 210-day</td><td style="font-family:var(--f-body);white-space:normal">+1.9 pts CAGR (2010+: +2.9) with a smaller drawdown in every test; >50%-drop odds 9% → 4%</td></tr>
     </tbody></table></div>
-    <div class="muted" style="font-size:12.5px;margin-top:8px">Rejected, with numbers in the Idea Lab: more leverage via futures/margin (needs $25k+ and approval, −55% to −94% drawdowns), crash-warning signals (VIX term structure, VVIX, credit, canary: cost 1–12 pts), long-volatility ETFs (−2.5 to −9 pts), extra LDS assets, Bitcoin (unproven), trend filters on TQQQ (the volatility switch already does this), calendar effects other than turn-of-month and Fed days. 50/50 vs 60/40 vs 70/30 compared Oct 19: staying 50/50.</div></div>`;
+    <div class="muted" style="font-size:12.5px;margin-top:8px">Rejected, with numbers in the Idea Lab: more leverage via futures/margin (needs $25k+ and approval, −55% to −94% drawdowns), crash-warning signals (VIX term structure, VVIX, credit, canary: cost 1–12 pts), long-volatility ETFs (−2.5 to −9 pts), extra LDS assets, Bitcoin (unproven), trend filters on TQQQ (the volatility switch already does this), calendar effects other than turn-of-month and Fed days. 50/50 vs 60/40 vs 70/30 compared Oct 19: staying 50/50. Oct 21: non-tech 3x ETFs in 9Sig (kept TQQQ only); 93 more ideas in round 8 (Santa rally and fear premium were fragile).</div></div>`;
   drawBt();
 }
 function drawBt(){

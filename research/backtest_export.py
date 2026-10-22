@@ -9,10 +9,10 @@ SCEN = {"2000-2026": dict(), "2007-2026 (fresh start)": dict(start="2007-01-03")
         "2000-2026, double trading costs": dict(slippage_bps=10.0)}
 
 def _run(a):
-    """research copy with the v1.6 switches (matches the production engine within 0.1%) - it also records daily exposures"""
+    """research copy with the current (v1.7) switches (matches the production engine within 0.1%) - it also records daily exposures"""
     import bt
     from round4 import V15
-    n, kw = a; s = bt.run({**V15, "lds_assets": ("SPY", "TLT", "GLD")}, lab=True, **kw); return n, s
+    n, kw = a; s = bt.run({**V15, "lds_assets": ("SPY", "TLT", "GLD"), "core_trend": "dual", "dual_fast": 30}, lab=True, **kw); return n, s
 
 def cagr(e): return (e.iloc[-1] / e.iloc[0]) ** (365.25 / (e.index[-1] - e.index[0]).days) - 1
 def mdd(e): return float((e / e.cummax() - 1).min())

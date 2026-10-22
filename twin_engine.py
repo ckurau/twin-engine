@@ -30,7 +30,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 STATE_PATH = os.path.join(HERE, "state.json")
 SUMMARY_PATH = os.path.join(HERE, "summary.json")
 PREVIEW_PATH = os.path.join(HERE, "preview.json")
-VERSION = "1.6.0"
+VERSION = "1.7.0"
 
 # ----------------------------------------------------------------------------- parameters (backtested values)
 P = dict(
@@ -58,6 +58,7 @@ P = dict(
     lds_vol_target=1.00,        # core risk parity scaled to 100% vol target -> capped by available leverage
     lds_overlay_vol=0.15,
     sma_days=210, cov_days=63,
+    lds_fast_sma=30,            # v1.7 "dual trend": an LDS core asset also needs its 30-day average above its 210-day average
     lds_threshold=0.05,         # LDS review trades only if total change > 5% of the sleeve
     # --- execution
     slippage_bps=2.0,
@@ -222,9 +223,11 @@ def lds_exposures(adj: pd.DataFrame):
     diag = {}
     core = {}
     for a in A:
-        s = px[a]; sma = float(s.iloc[-P["sma_days"]:].mean()); up = float(s.iloc[-1]) >= sma
+        s = px[a]; sma = float(s.iloc[-P["sma_days"]:].mean()); fast = float(s.iloc[-P["lds_fast_sma"]:].mean()) if P["lds_fast_sma"] else None
+        above = float(s.iloc[-1]) >= sma; up = above and (fast is None or fast > sma)
         v = _vol(r[a], n); bm = np.nanmean([_mom(s, k) for k in (1, 3, 6, 12)])
         diag[a] = dict(price=float(s.iloc[-1]), sma=sma, pct_vs_sma=float(s.iloc[-1] / sma - 1), trend="UP" if up else "DOWN",
+                       fast=fast, fast_vs_sma=(fast / sma - 1) if fast else None, above_sma=above,
                        vol63=v, mom_blend=float(bm), overlay="LONG" if bm > 0 else "SHORT")
         if up: core[a] = 1 / v
     def scale(w, V):
@@ -425,7 +428,9 @@ def step(st, date, adj: pd.DataFrame, close: dict, cal: Calendar, divs: dict | N
         lds["fomc_swap"] = dict(active=False, last=swap.get("decision")); swapped_back = True
         ev.append("Fed-day swap ended: LDS sleeve back to its trend/risk positions")
     # --- LDS review (last session of the month; v1.3: of the week) or first day
-    rule_change = bool(st["last_date"]) and lds.get("assets", ["SPY", "QQQ", "TLT", "GLD"]) != list(P["lds_assets"])   # asset list changed (v1.6): rebalance once
+    rules_now = list(P["lds_assets"]) + [f"fast{P['lds_fast_sma']}"]
+    rules_was = lds.get("rules") or (list(lds.get("assets", ["SPY", "QQQ", "TLT", "GLD"])) + ["fastNone"])
+    rule_change = bool(st["last_date"]) and rules_was != rules_now      # LDS rules changed (v1.6 assets, v1.7 dual trend): rebalance once
     if (cal.is_lds_review(date) or lds_force or rule_change) and not swapped_back:
         caps = implement(ex); vl = sleeve_value(st, "LDS", close)
         tg = {t: c * vl for t, c in caps.items()}
@@ -433,11 +438,11 @@ def step(st, date, adj: pd.DataFrame, close: dict, cal: Calendar, divs: dict | N
         turn = sum(abs(tg.get(t, 0) - cur.get(t, 0)) for t in set(tg) | set(cur))
         lds["last_turnover"] = turn / vl if vl else 0.0
         if turn > P["lds_threshold"] * vl or lds_force or rule_change:
-            set_targets(st, "LDS", tg, close, date, "Initial allocation" if lds_force else ("LDS rebalance: v1.6 rule change (no QQQ)" if rule_change else "LDS monthly rebalance"))
+            set_targets(st, "LDS", tg, close, date, "Initial allocation" if lds_force else (f"LDS rebalance: v{VERSION[:3]} rule change" if rule_change else "LDS monthly rebalance"))
             lds["exposures"] = ex; lds["last_rebalance"] = str(date.date()); ev.append(f"LDS rebalanced (turnover {turn / vl:.0%})")
         else:
             ev.append(f"LDS monthly check: turnover {turn / vl:.1%} < 5%, no trade")
-        lds["last_check"] = str(date.date()); lds["target_exposures"] = ex; lds["assets"] = list(P["lds_assets"])
+        lds["last_check"] = str(date.date()); lds["target_exposures"] = ex; lds["assets"] = list(P["lds_assets"]); lds["rules"] = rules_now
     # --- LDS: FOMC swap in (close before a scheduled Fed decision): whole LDS sleeve into the swap ETF for one day
     if P["fomc_swap"] and cal.is_pre_fomc(date) and not (lds.get("fomc_swap") or {}).get("active"):
         vl = sleeve_value(st, "LDS", close); dec = cal.next_day(date)
@@ -481,7 +486,7 @@ GUARDRAILS = dict(
     dd_expected=-0.40,      # drawdowns to here are normal for this strategy: keep following the rules
     dd_review=-0.55,        # deeper than the backtest ever went: review with Claude (data/feed/ETF problems?), keep the rules
     dd_pause=-0.65,         # pause new money and review whether to continue; existing positions keep following the rules
-    trail_12m=-0.114,       # 12-month return below the backtest's worst 5% (-11.4%): review
+    trail_12m=-0.089,       # 12-month return below the backtest's worst 5% (v1.7: -8.9%): review
     lag_spy_3y=0.10,        # after 3+ years live: CAGR more than 10 pts below SPY's -> consider moving to a plain index fund
     min_3y_cagr=0.05,       # after 3+ years live: CAGR below 5% a year (backtest worst 5% was 13.1%) -> strategy may have stopped working
 )
@@ -581,12 +586,13 @@ def build_summary(st, adj, close, cal, demo=False):
                     exit_rule = f"Held while {und}'s blended 1/3/6/12-month momentum is negative (now {d.get('mom_blend', float('nan')):+.1%}). Reviewed at the monthly close {nxt_week:%a %b %d}."
                 elif d.get("trend") == "UP":
                     role = f"LDS core — {und}"
-                    exit_rule = (f"Core position: held while {und} closes above its 210-day average (now {d.get('pct_vs_sma', float('nan')):+.1%} vs avg ${d.get('sma', float('nan')):,.2f}). "
+                    exit_rule = (f"Core position: held while {und} closes above its 210-day average (now {d.get('pct_vs_sma', float('nan')):+.1%} vs avg ${d.get('sma', float('nan')):,.2f}) "
+                                 f"and its 30-day average stays above the 210-day (now {(d.get('fast_vs_sma') or 0):+.1%}). "
                                  f"Exits/resizes at the monthly review, close {nxt_week:%a %b %d}, if the trend breaks or weights shift >5%.")
                 else:
                     role = f"LDS overlay — {und} momentum"
-                    exit_rule = (f"Core trend is OFF ({und} {d.get('pct_vs_sma', float('nan')):+.1%} vs its 210-day average), so only the small momentum overlay holds it: "
-                                 f"long while blended 1/3/6/12-month momentum is positive (now {d.get('mom_blend', float('nan')):+.1%}). Core returns if {und} closes above ${d.get('sma', float('nan')):,.2f} at a monthly review (next {nxt_week:%a %b %d}).")
+                    exit_rule = (f"Core trend is OFF ({und} {d.get('pct_vs_sma', float('nan')):+.1%} vs its 210-day average, 30-day average {(d.get('fast_vs_sma') or 0):+.1%} vs it), so only the small momentum overlay holds it: "
+                                 f"long while blended 1/3/6/12-month momentum is positive (now {d.get('mom_blend', float('nan')):+.1%}). Core returns when {und} closes above ${d.get('sma', float('nan')):,.2f} with its 30-day average above that too, at a monthly review (next {nxt_week:%a %b %d}).")
                 review = str(nxt_week.date())
             positions.append(dict(
                 ticker=tk, name=NAMES.get(tk, tk), sleeve=sl, underlying=und, shares=round(sh, 4), price=round(close[tk], 4),
