@@ -475,11 +475,10 @@ def next_fomc(cal, date):
 # Important dates shown on the dashboard (Overview > Important dates). Add or edit lines here: (date, what, why/how).
 # Open to-do items shown on the dashboard (Overview > To do). Remove a line when it's done.
 TODO = [
-    ("Before go-live", "Fund the Roth", "About $14k there now; add the 2026 contribution (limit about $7,500) so it settles before Mon Oct 26."),
-    ("Before go-live", "Dry run Tue-Fri: enter each preview's orders in thinkorswim without sending", "Tue Oct 20 at ~12:15 PM PT: the one-time v1.6 switch in LDS (sell TQQQ, buy UPRO)."),
-    ("Decide", "Orders: fully automatic or one tap to approve?", "Fully automatic = orders placed ~12:15 PM PT with a pause switch. One tap = an Approve link; nothing trades if not tapped."),
-    ("Decide", "Alerts: push app (ntfy / Pushover) or text message (Twilio)?", "Push is free or $5 one-time and supports Approve buttons; texts cost about $2/month and need ~2 weeks of carrier registration."),
-    ("Decide", "Start the Schwab developer registration?", "developer.schwab.com: create an app and link the Roth. Approval takes days to weeks; needed for any automatic or one-tap ordering."),
+    ("Before go-live", "Fund the Roth", "Add the 2026 contribution (limit about $7,500) so it has settled before the Mon Oct 26 close."),
+    ("Decide", "Orders: fully automatic or one tap to approve?", "Recommended: one tap. Fully automatic = orders placed ~12:15 PM PT with a pause switch. One tap = an Approve link; nothing trades if not tapped."),
+    ("Decide", "Alerts: push app (ntfy / Pushover) or text message (Twilio)?", "Recommended: ntfy (free). Push supports Approve buttons; texts cost about $2/month and need ~2 weeks of carrier registration."),
+    ("Decide", "Start the Schwab developer registration?", "Recommended: start now. developer.schwab.com: create an app and link the Roth. Approval takes days to weeks; needed for any automatic or one-tap ordering."),
 ]
 
 CRON_TOKEN_EXPIRES = "2027-10-19"   # GitHub token used by cron-job.org (health check warns 30 days ahead)
