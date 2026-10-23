@@ -1,6 +1,6 @@
 {
- "generated": "2026-10-22T20:01:55-04:00",
- "generated_et": "Thu Oct 22, 8:01 PM ET",
+ "generated": "2026-10-22T20:56:27-04:00",
+ "generated_et": "Thu Oct 22, 8:56 PM ET",
  "overall": "warn",
  "counts": {
   "fail": 0,
@@ -59,7 +59,7 @@
    "group": "Data",
    "name": "Price data (Yahoo Finance)",
    "status": "warn",
-   "detail": "Yahoo doesn't have the Oct 22 close yet (latest Oct 21, 4 h after that close).",
+   "detail": "Yahoo doesn't have the Oct 22 close yet (latest Oct 21, 5 h after that close).",
    "fix": "Usually Yahoo catches up within hours. If this is still failing by the next morning, ask Claude."
   },
   {
@@ -204,6 +204,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-22T20:56:27-04:00",
+   "overall": "warn",
+   "fails": 0,
+   "warns": 1
+  },
   {
    "t": "2026-10-22T20:01:55-04:00",
    "overall": "warn",
@@ -554,12 +560,6 @@
   },
   {
    "t": "2026-10-21T09:25:23-04:00",
-   "overall": "ok",
-   "fails": 0,
-   "warns": 0
-  },
-  {
-   "t": "2026-10-21T00:13:06-04:00",
    "overall": "ok",
    "fails": 0,
    "warns": 0
