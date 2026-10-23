@@ -1,13 +1,13 @@
 {
- "generated": "2026-10-23T19:11:12-04:00",
- "generated_et": "Fri Oct 23, 7:11 PM ET",
- "overall": "ok",
+ "generated": "2026-10-23T19:53:37-04:00",
+ "generated_et": "Fri Oct 23, 7:53 PM ET",
+ "overall": "warn",
  "counts": {
   "fail": 0,
   "fixing": 0,
-  "warn": 0,
+  "warn": 1,
   "pending": 0,
-  "ok": 21,
+  "ok": 20,
   "info": 7
  },
  "version": "1.7.0",
@@ -79,9 +79,9 @@
   {
    "group": "Data",
    "name": "Every ETF still trades",
-   "status": "ok",
-   "detail": "All 22 ETFs traded on the Oct 23 session.",
-   "fix": ""
+   "status": "warn",
+   "detail": "No trade on the last session for: UBT (replacement: ask Claude).",
+   "fix": "Check the issuer's site for a closure notice. Ask Claude to switch the ETF; nothing is switched automatically."
   },
   {
    "group": "Account",
@@ -211,6 +211,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-23T19:53:37-04:00",
+   "overall": "warn",
+   "fails": 0,
+   "warns": 1
+  },
   {
    "t": "2026-10-23T19:11:12-04:00",
    "overall": "ok",
@@ -561,12 +567,6 @@
   },
   {
    "t": "2026-10-21T19:21:50-04:00",
-   "overall": "ok",
-   "fails": 0,
-   "warns": 0
-  },
-  {
-   "t": "2026-10-21T19:21:21-04:00",
    "overall": "ok",
    "fails": 0,
    "warns": 0
