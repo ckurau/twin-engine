@@ -51,12 +51,13 @@ def run(overrides=None, start="2000-01-03", end=None, capital=20000.0, slippage_
         idx = A.index; i0 = idx.searchsorted(pd.Timestamp(start)); i1 = len(idx) if end is None else idx.searchsorted(pd.Timestamp(end), side="right")
         cal = te_lab.Calendar(idx[:i1]) if lab else te.Calendar(idx[:i1])
         stepf = te_lab.step if lab else te.step
+        win = (overrides or {}).get("win", WIN)
         st = te.new_state(capital, idx[i0], 0.0)
         vals = A.values
         for i in range(i0, i1):
             d = idx[i]
             close = dict(zip(cols, vals[i]))
-            stepf(st, d, A.iloc[max(0, i - WIN):i + 1], close, cal)
+            stepf(st, d, A.iloc[max(0, i - win):i + 1], close, cal)
         eq = pd.Series([e["value"] for e in st["equity"]], index=pd.to_datetime([e["date"] for e in st["equity"]]))
         tdays = len({t["date"] for t in st["trades"]})
         s = stats(eq, tdays); s["equity"] = eq; s["n_trades"] = len(st["trades"])

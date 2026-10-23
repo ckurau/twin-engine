@@ -40,7 +40,8 @@ DEFAULTS = dict(growth=("TQQQ",), derisk_asset=None, def_trend=False, def_sma=20
                 dual_ema=False, tri_fast=None, dual_band=None, overlay_dual=False, lds_exit_check=None, core_strength=None,
                 nine_dual_cap=None, def_dual=False, lds_crash=None, dd_boost=None, swap_fomc_dual=False, q_gate=None, q_sell_skip_dual=False,
                 mom_skip1=False, dip_lev=None,
-                cap_sig=None, boost_sig=None, split_sig=None, tlt_carry=False, overlay_bear=False, chand=None, trend_params=None)
+                cap_sig=None, boost_sig=None, split_sig=None, tlt_carry=False, overlay_bear=False, chand=None, trend_params=None,
+                res_swap=None, split_dyn=None)
 LDS_MEM = {}      # per-run memory for hysteresis (reset by bt.run)
 LEV_OF = {t: (a, L) for (a, L), t in ETF.items()}
 
@@ -153,7 +154,12 @@ def _hlc(adj):
     return h, l, c
 
 def sig(spec, adj, st, date, cal, tomorrow):
-    """True = favourable / risk-on, False = unfavourable / risk-off, None = no data (neutral)"""
+    """True = favourable / risk-on, False = unfavourable / risk-off, None = no data (neutral); cached per day"""
+    cache = st.setdefault("sigcache", {}); key = repr(spec)
+    if key in cache and cache[key][0] == date: return cache[key][1]
+    v = _sig(spec, adj, st, date, cal, tomorrow); cache[key] = (date, v); return v
+
+def _sig(spec, adj, st, date, cal, tomorrow):
     name = spec[0]; a = spec[1:] if len(spec) > 1 else ()
     q = adj["QQQ"].dropna(); mem = st.setdefault("sigmem", {})
     def above(x, n=200): return bool(float(x.iloc[-1]) > float(x.iloc[-n:].mean())) if x is not None and len(x) >= n else None
@@ -247,6 +253,145 @@ def sig(spec, adj, st, date, cal, tomorrow):
         w = q.resample("W-FRI").last().dropna()
         if len(w) < 40: return None
         m = w.ewm(span=12).mean() - w.ewm(span=26).mean(); return bool(float(m.iloc[-1]) > float(m.ewm(span=9).mean().iloc[-1]))
+    # ---- round 11 -------------------------------------------------------------------------------------------
+    sma = lambda x, n: float(x.iloc[-n:].mean())
+    r1 = lambda x, n: float(x.iloc[-1] / x.iloc[-1 - n] - 1) if x is not None and len(x) > n else None
+    def ratio_above(t, n=200):
+        if t not in adj or "SPY" not in adj: return None
+        x = (adj[t] / adj["SPY"]).dropna(); return above(x, n)
+    key = repr(spec)
+    if name == "vote":
+        k, specs = a; vals = [sig(sp, adj, st, date, cal, tomorrow) for sp in specs]; vals = [v for v in vals if v is not None]
+        return None if len(vals) < 2 else sum(vals) >= k * len(vals) / len(specs)
+    if name == "ath": return bool(float(q.iloc[-1]) >= (1 - a[0]) * float(q.iloc[-252:].max())) if len(q) > 252 else None
+    if name == "notdeep": return bool(float(q.iloc[-1]) > (1 - a[0]) * float(q.iloc[-252:].max())) if len(q) > 252 else None
+    if name == "notover": return bool(float(q.iloc[-1]) < (1 + a[0]) * sma(q, 200)) if len(q) > 200 else None
+    if name == "skew":
+        r = q.pct_change().iloc[-60:]; return bool(float(r.skew()) > a[0]) if len(q) > 61 else None
+    if name == "sharpe":
+        r = q.pct_change().iloc[-252:]; return bool(float(r.mean() / r.std() * 15.87) > a[0]) if len(q) > 253 else None
+    if name == "vol_fall":
+        r = q.pct_change(); return bool(float(r.iloc[-20:].std()) < float(r.iloc[-60:].std())) if len(q) > 61 else None
+    if name == "accel":
+        a3, a12 = r1(q, 63), r1(q, 252); return None if a12 is None else bool(a3 > 0 and a3 > a12 / 4)
+    if name == "vr":
+        if len(q) < 260: return None
+        lr = np.log(q.iloc[-253:]).diff().dropna(); r5 = lr.rolling(5).sum().dropna()
+        return bool(float(r5.var()) / (5 * float(lr.var())) > 1)
+    if name == "ac":
+        r = q.pct_change().iloc[-63:]; return bool(float(r.autocorr(1)) > 0) if len(q) > 64 else None
+    if name == "dbc_calm":
+        x = _col(adj, "DBC"); v = r1(x, 126); return None if v is None else v < a[0]
+    if name in ("tlt_calm", "gold_calm", "usd_calm"):
+        x = _col(adj, {"tlt_calm": "TLT", "gold_calm": "GLD", "usd_calm": "DXY"}[name]); v = r1(x, 20); return None if v is None else v < a[0]
+    if name == "lag": x = ratio_above(a[0]); return None if x is None else not x
+    if name == "lead": return ratio_above(a[0])
+    if name == "tech_lead": return ratio_above("QQQ")
+    if name == "gold_tsy":
+        g, t = _col(adj, "GLD"), _col(adj, "TLT"); x, y = r1(g, 63), r1(t, 63); return None if x is None or y is None else x > y
+    if name == "copper": return above(_col(adj, "HG"))
+    if name == "yld_down": x = above(_col(adj, "TNX")); return None if x is None else not x
+    if name == "tlt_down": x = above(_col(adj, "TLT")); return None if x is None else not x
+    if name == "vix_low": x = _col(adj, "VIXLVL"); return None if x is None else float(x.iloc[-1]) < a[0]
+    if name == "hiking":
+        x = _col(adj, "IRXL"); return None if x is None or len(x) < 130 else float(x.iloc[-1]) - float(x.iloc[-127]) < a[0]
+    if name == "sb_corr":
+        r = adj[["SPY", "TLT"]].dropna().pct_change().iloc[-60:]; return bool(float(r.corr().iloc[0, 1]) < 0) if len(r) >= 60 else None
+    if name == "breadth":
+        cols = [c for c in ("SPY", "QQQ", "IWM", "DIA", "EFA", "EEM", "XLK", "XLU", "XLE", "XLV", "XLF", "VNQ") if c in adj]
+        res = [above(adj[c].dropna()) for c in cols]; res = [x for x in res if x is not None]
+        return None if len(res) < 5 else sum(res) / len(res) >= a[0]
+    if name == "turb":
+        R = adj[["SPY", "TLT", "GLD", "QQQ", "IWM"]].iloc[-260:].dropna().pct_change().dropna()
+        h_ = mem.setdefault(key, [])
+        if len(R) < 200: return None
+        x = (R.iloc[-1] - R.iloc[:-1].mean()).values; S = np.cov(R.iloc[:-1].values.T)
+        h_.append(float(x @ np.linalg.pinv(S) @ x)); del h_[:-300]
+        if len(h_) < 120: return None
+        return bool(np.mean(h_[-5:]) <= np.quantile(h_[-252:], a[0]))
+    if name == "absorb":
+        cols = [c for c in ("SPY", "QQQ", "IWM", "EFA", "EEM", "TLT", "GLD", "XLE", "XLU", "XLF") if c in adj and adj[c].iloc[-61:].notna().all()]
+        h_ = mem.setdefault(key, [])
+        if len(cols) < 5: return None
+        C = adj[cols].iloc[-61:].pct_change().dropna().corr().values; ev = np.sort(np.linalg.eigvalsh(C))[::-1]
+        h_.append(float(ev[:2].sum() / ev.sum())); del h_[:-300]
+        if len(h_) < 120: return None
+        z = (np.mean(h_[-15:]) - np.mean(h_[-252:])) / (np.std(h_[-252:]) + 1e-9); return bool(z < a[0])
+    if name in ("ftd", "capit", "recov"):
+        m = mem.setdefault(key, {"left": 0}); m["left"] = max(0, m["left"] - 1)
+        if len(q) < 253: return None
+        hi = float(q.iloc[-252:].max()); dd = float(q.iloc[-1]) / hi - 1; ret = float(q.iloc[-1] / q.iloc[-2] - 1)
+        vs = _col(adj, "QQQ_V") if _col(adj, "QQQ_V") is not None and len(_col(adj, "QQQ_V")) > 60 else _col(adj, "NDX_V")
+        vol_ok = vs is not None and len(vs) > 60 and vs.index[-1] == q.index[-1] and float(vs.iloc[-60:].min()) > 0
+        if name == "ftd":
+            th, hold = a
+            if dd <= -0.10 and not m.get("corr"): m["corr"] = True; m["tr"] = float(q.iloc[-1]); m["n"] = 0
+            if m.get("corr"):
+                if float(q.iloc[-1]) < m["tr"]: m["tr"] = float(q.iloc[-1]); m["n"] = 0
+                else: m["n"] += 1
+                vup = (float(vs.iloc[-1]) > float(vs.iloc[-2])) if vol_ok else True
+                if m["n"] >= 4 and ret >= th / 100 and vup: m["left"] = hold; m["corr"] = False
+                elif dd > -0.03: m["corr"] = False
+        elif name == "capit":
+            mult, hold = a
+            if not vol_ok: return None
+            if ret < -0.015 and float(vs.iloc[-1]) > mult * float(vs.iloc[-51:-1].mean()) and float(q.iloc[-1]) < sma(q, 200): m["left"] = hold
+        else:
+            if dd <= -0.20 and not m.get("bear"): m["bear"] = True; m["tr"] = float(q.iloc[-1]); m["hi"] = hi
+            if m.get("bear"):
+                m["tr"] = min(m["tr"], float(q.iloc[-1]))
+                if float(q.iloc[-1]) >= m["tr"] + a[0] * (m["hi"] - m["tr"]): m["left"] = 63; m["bear"] = False
+        return m["left"] > 0
+    if name == "crashbuy":
+        if len(q) < 253: return None
+        return bool(float(q.iloc[-1]) <= (1 - a[0]) * float(q.iloc[-252:].max()) and float(q.iloc[-1]) > float(q.iloc[-6]))
+    if name in ("nr", "dstreak", "nostreak", "pctb", "keltner", "aroon", "adx", "supertrend", "gcross"):
+        h, l, c = _hlc(adj)
+        if c is None or len(c) < 260 or c.index[-1] != q.index[-1]: return None
+        h, l, c = h.iloc[-300:], l.iloc[-300:], c.iloc[-300:]; up200 = float(c.iloc[-1]) > sma(c, 200)
+        tr = pd.concat([h - l, (h - c.shift()).abs(), (l - c.shift()).abs()], axis=1).max(axis=1)
+        if name == "nr": rg = (h - l).iloc[-a[0]:]; return bool(float(rg.iloc[-1]) <= float(rg.min()) and up200)
+        if name == "dstreak": return bool((c.diff().iloc[-a[0]:] < 0).all() and up200)
+        if name == "nostreak": return not bool((c.diff().iloc[-a[0]:] > 0).all())
+        if name == "pctb":
+            m20, sd = sma(c, 20), float(c.iloc[-20:].std()); return bool(float(c.iloc[-1]) < m20 - 2 * sd and up200)
+        if name == "keltner": return bool(float(c.iloc[-1]) > float(c.ewm(span=20).mean().iloc[-1]) + 2 * float(tr.iloc[-10:].mean()))
+        if name == "aroon":
+            w = c.iloc[-26:]; up = 100 * (25 - (25 - int(np.argmax(w.values)))) / 25; dn = 100 * (25 - (25 - int(np.argmin(w.values)))) / 25
+            return bool(up > 70 and dn < 30)
+        if name == "adx":
+            upm, dnm = h.diff(), -l.diff(); pdm = upm.where((upm > dnm) & (upm > 0), 0.0); ndm = dnm.where((dnm > upm) & (dnm > 0), 0.0)
+            atr = tr.ewm(alpha=1 / 14).mean(); pdi = 100 * pdm.ewm(alpha=1 / 14).mean() / atr; ndi = 100 * ndm.ewm(alpha=1 / 14).mean() / atr
+            dx = 100 * (pdi - ndi).abs() / (pdi + ndi); adx = dx.ewm(alpha=1 / 14).mean()
+            return bool(float(adx.iloc[-1]) > a[0] and float(pdi.iloc[-1]) > float(ndi.iloc[-1]))
+        if name == "gcross":
+            m50, m200 = c.rolling(50).mean().iloc[-61:], c.rolling(200).mean().iloc[-61:]
+            return bool(float(m50.iloc[-1]) > float(m200.iloc[-1]) and (m50 <= m200).any())
+        # supertrend (stateful)
+        n_, k_ = a; m = mem.setdefault(key, {}); atr = float(tr.iloc[-n_:].mean()); hl2 = (float(h.iloc[-1]) + float(l.iloc[-1])) / 2
+        ub, lb = hl2 + k_ * atr, hl2 - k_ * atr; pc = m.get("pc", float(c.iloc[-2]))
+        fub = ub if ("fub" not in m or ub < m["fub"] or pc > m["fub"]) else m["fub"]
+        flb = lb if ("flb" not in m or lb > m["flb"] or pc < m["flb"]) else m["flb"]
+        d_ = m.get("dir", True); cc = float(c.iloc[-1])
+        if d_ and cc < flb: d_ = False
+        elif not d_ and cc > fub: d_ = True
+        m.update(fub=fub, flb=flb, dir=d_, pc=cc); return d_
+    if name == "wrsi":
+        w = q.resample("W-FRI").last().dropna().iloc[-120:]
+        if len(w) < 30: return None
+        d = w.diff(); g = d.clip(lower=0).ewm(alpha=1 / 14).mean(); ls = (-d.clip(upper=0)).ewm(alpha=1 / 14).mean()
+        return bool(100 - 100 / (1 + float(g.iloc[-1]) / max(float(ls.iloc[-1]), 1e-12)) < a[0])
+    if name == "coppock":
+        mth = q.resample("ME").last().dropna().iloc[:-1]
+        if len(mth) < 30: return None
+        rc = (mth / mth.shift(14) - 1) + (mth / mth.shift(11) - 1); wts = np.arange(1, 11)
+        cp = rc.rolling(10).apply(lambda x: float(np.dot(x, wts) / wts.sum()), raw=True)
+        return bool(float(cp.iloc[-2]) < 0 and float(cp.iloc[-1]) > float(cp.iloc[-2]))
+    if name == "earn": return (tomorrow.month % 3 == 1 and tomorrow.day >= 10) or (tomorrow.month % 3 == 2 and tomorrow.day <= 7)
+    if name == "earnw":   # first month of the quarter from day d0 through day d1 of the second month
+        d0, d1 = a; return (tomorrow.month % 3 == 1 and tomorrow.day >= d0) or (tomorrow.month % 3 == 2 and tomorrow.day <= d1)
+    if name == "midq4": return tomorrow.year % 4 == 2 and tomorrow.month >= 10
+    if name == "sept": return tomorrow.month != 9
     raise ValueError(name)
 
 def uptrend_pre(q): return float(q.iloc[-1]) > float(q.iloc[-200:].mean())
@@ -370,7 +515,7 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
     if nine["initialized"] and prev:
         rq = np.mean([close[t] / prev[t] - 1 for t in growth])
         dh = nine.get("def_hold") or deff
-        dw = nine.get("def_w") or {t: 1 / len(dh) for t in dh}
+        dw = nine.get("def_w") or {t: dh.count(t) / len(dh) for t in set(dh)}
         rd = sum(dw.get(t, 0) * (close[t] / prev[t] - 1) for t in set(dh))
         rx = close[p("derisk_asset")] / prev[p("derisk_asset")] - 1 if p("derisk_asset") else rd
         a = nine["w"] * rq + (1 - nine["w"]) * rx
@@ -414,6 +559,18 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
     if p("split_sig") and st["last_date"]:
         spec, on_, off_ = p("split_sig"); ok = sig(spec, adj, st, date, cal, cal.next_day(date))
         want = P["split_9sig"] if ok is None else (on_ if ok else off_)
+        if rebal: split = want
+        elif cal.is_month_end(date):
+            sh = sleeve_value(st, "9SIG", close) / total_value(st, close)
+            if abs(sh - want) > 0.05: rebal = True; split = want
+    if p("split_dyn") and st["last_date"] and len(st["equity"]) > 260:
+        kd = p("split_dyn"); E = pd.DataFrame(st["equity"][-260:])[["nine", "lds"]]
+        if kd[0] == "rp":
+            lb, lo, hi = kd[1:]; v = E.pct_change().iloc[-lb:].std(); want = float(min(hi, max(lo, v["lds"] / (v["nine"] + v["lds"]))))
+        elif kd[0] == "mom":
+            lb, t_ = kd[1:]; rr = E.iloc[-1] / E.iloc[-1 - lb] - 1; want = P["split_9sig"] + (t_ if rr["nine"] > rr["lds"] else -t_)
+        else:
+            want = kd[1] if nine["w_base"] < 0.5 else P["split_9sig"]
         if rebal: split = want
         elif cal.is_month_end(date):
             sh = sleeve_value(st, "9SIG", close) / total_value(st, close)
@@ -512,6 +669,8 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
         iv = {t: 1 / max(float(adj[t].pct_change().iloc[-63:].std()), 1e-6) for t in set(def_new)}; tot_ = sum(iv.values())
         new_w = {t: round(v / tot_, 2) for t, v in iv.items()}
         if new_w != nine.get("def_w") and (cal.is_month_end(date) or not nine.get("def_w")): nine["def_w"] = new_w; nine_trade = True
+    if p("res_swap") and bull:
+        ra, rf_ = p("res_swap"); def_new = [ra] if rf_ >= 1 else list(def_new) + [ra] * len(def_new)
     def_changed = (nine.get("def_hold") or deff) != def_new
     if abs(w_new - nine["w"]) > 1e-9 or nine_trade or def_changed:
         nine["w"] = w_new; nine["def_hold"] = def_new
