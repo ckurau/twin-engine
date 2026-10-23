@@ -1,12 +1,12 @@
 {
- "generated": "2026-10-23T16:27:16-04:00",
- "generated_et": "Fri Oct 23, 4:27 PM ET",
+ "generated": "2026-10-23T16:55:27-04:00",
+ "generated_et": "Fri Oct 23, 4:55 PM ET",
  "overall": "ok",
  "counts": {
   "fail": 0,
   "fixing": 0,
   "warn": 0,
-  "pending": 1,
+  "pending": 0,
   "ok": 21,
   "info": 7
  },
@@ -18,13 +18,6 @@
    "name": "Daily run booked the last close",
    "status": "ok",
    "detail": "Account is as of the Fri Oct 23 close.",
-   "fix": ""
-  },
-  {
-   "group": "Schedule",
-   "name": "Today's close",
-   "status": "pending",
-   "detail": "The daily run books today's close at about Fri Oct 23, 4:20 PM ET.",
    "fix": ""
   },
   {
@@ -45,7 +38,7 @@
    "group": "Schedule",
    "name": "On-time trigger (cron-job.org)",
    "status": "ok",
-   "detail": "Preview started 3:15 PM ET today; daily run started Thu 04:20 PM ET.",
+   "detail": "Preview started 3:15 PM ET today; daily run started Fri 04:20 PM ET.",
    "fix": ""
   },
   {
@@ -66,7 +59,7 @@
    "group": "Data",
    "name": "Price data (Yahoo Finance)",
    "status": "ok",
-   "detail": "All 22 tickers have the Oct 22 close.",
+   "detail": "All 22 tickers have the Oct 23 close.",
    "fix": ""
   },
   {
@@ -87,7 +80,7 @@
    "group": "Data",
    "name": "Every ETF still trades",
    "status": "ok",
-   "detail": "All 22 ETFs traded on the Oct 22 session.",
+   "detail": "All 22 ETFs traded on the Oct 23 session.",
    "fix": ""
   },
   {
@@ -218,6 +211,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-23T16:55:27-04:00",
+   "overall": "ok",
+   "fails": 0,
+   "warns": 0
+  },
   {
    "t": "2026-10-23T16:27:16-04:00",
    "overall": "ok",
@@ -568,12 +567,6 @@
   },
   {
    "t": "2026-10-21T17:25:29-04:00",
-   "overall": "ok",
-   "fails": 0,
-   "warns": 0
-  },
-  {
-   "t": "2026-10-21T16:55:29-04:00",
    "overall": "ok",
    "fails": 0,
    "warns": 0
