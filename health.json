@@ -1,14 +1,14 @@
 {
- "generated": "2026-10-22T20:56:27-04:00",
- "generated_et": "Thu Oct 22, 8:56 PM ET",
- "overall": "warn",
+ "generated": "2026-10-23T09:25:35-04:00",
+ "generated_et": "Fri Oct 23, 9:25 AM ET",
+ "overall": "ok",
  "counts": {
   "fail": 0,
   "fixing": 0,
-  "warn": 1,
-  "pending": 0,
+  "warn": 0,
+  "pending": 1,
   "ok": 20,
-  "info": 6
+  "info": 7
  },
  "version": "1.7.0",
  "schedule": "Every 30 minutes on weekdays 9:25 AM - 5:55 PM ET (cron-job.org), right after each preview and daily run, and hourly as a backup.",
@@ -23,8 +23,8 @@
   {
    "group": "Schedule",
    "name": "Today's order preview",
-   "status": "ok",
-   "detail": "Arrived 15:15 ET: no orders today.",
+   "status": "pending",
+   "detail": "Due at about Fri Oct 23, 3:15 PM ET.",
    "fix": ""
   },
   {
@@ -38,7 +38,7 @@
    "group": "Schedule",
    "name": "On-time trigger (cron-job.org)",
    "status": "ok",
-   "detail": "Preview started 3:15 PM ET today; daily run started Thu 04:20 PM ET.",
+   "detail": "Daily run started Thu 04:20 PM ET.",
    "fix": ""
   },
   {
@@ -58,9 +58,9 @@
   {
    "group": "Data",
    "name": "Price data (Yahoo Finance)",
-   "status": "warn",
-   "detail": "Yahoo doesn't have the Oct 22 close yet (latest Oct 21, 5 h after that close).",
-   "fix": "Usually Yahoo catches up within hours. If this is still failing by the next morning, ask Claude."
+   "status": "ok",
+   "detail": "All 22 tickers have the Oct 22 close.",
+   "fix": ""
   },
   {
    "group": "Data",
@@ -178,7 +178,7 @@
    "group": "Configuration",
    "name": "cron-job.org GitHub token",
    "status": "ok",
-   "detail": "Expires Oct 19, 2027 (362 days).",
+   "detail": "Expires Oct 19, 2027 (361 days).",
    "fix": ""
   },
   {
@@ -196,6 +196,13 @@
    "fix": ""
   },
   {
+   "group": "Reminders",
+   "name": "First monthly LDS review",
+   "status": "info",
+   "detail": "Fri Oct 30. Then turn-of-month window through Wed Nov 4.",
+   "fix": ""
+  },
+  {
    "group": "Live trading",
    "name": "Real account matches the paper account",
    "status": "info",
@@ -204,6 +211,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-23T09:25:35-04:00",
+   "overall": "ok",
+   "fails": 0,
+   "warns": 0
+  },
   {
    "t": "2026-10-22T20:56:27-04:00",
    "overall": "warn",
@@ -557,16 +570,10 @@
    "overall": "ok",
    "fails": 0,
    "warns": 0
-  },
-  {
-   "t": "2026-10-21T09:25:23-04:00",
-   "overall": "ok",
-   "fails": 0,
-   "warns": 0
   }
  ],
  "remediation": {
-  "date": "2026-10-22",
+  "date": "2026-10-23",
   "counts": {},
   "log": []
  },
