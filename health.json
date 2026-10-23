@@ -1,12 +1,12 @@
 {
- "generated": "2026-10-23T15:57:10-04:00",
- "generated_et": "Fri Oct 23, 3:57 PM ET",
+ "generated": "2026-10-23T16:21:00-04:00",
+ "generated_et": "Fri Oct 23, 4:21 PM ET",
  "overall": "ok",
  "counts": {
   "fail": 0,
   "fixing": 0,
   "warn": 0,
-  "pending": 0,
+  "pending": 1,
   "ok": 21,
   "info": 7
  },
@@ -17,7 +17,14 @@
    "group": "Schedule",
    "name": "Daily run booked the last close",
    "status": "ok",
-   "detail": "Account is as of the Thu Oct 22 close.",
+   "detail": "Account is as of the Fri Oct 23 close.",
+   "fix": ""
+  },
+  {
+   "group": "Schedule",
+   "name": "Today's close",
+   "status": "pending",
+   "detail": "The daily run books today's close at about Fri Oct 23, 4:20 PM ET.",
    "fix": ""
   },
   {
@@ -52,7 +59,7 @@
    "group": "Dashboard",
    "name": "Dashboard is published and current",
    "status": "ok",
-   "detail": "Live page shows the Thu Oct 22 close.",
+   "detail": "Live page shows the Fri Oct 23 close.",
    "fix": ""
   },
   {
@@ -94,14 +101,14 @@
    "group": "Account",
    "name": "9Sig bookkeeping",
    "status": "ok",
-   "detail": "Growth + reserve = $9,818 vs sleeve $9,818 (0.0% apart).",
+   "detail": "Growth + reserve = $9,785 vs sleeve $9,785 (0.0% apart).",
    "fix": ""
   },
   {
    "group": "Account",
    "name": "Engine split",
    "status": "ok",
-   "detail": "9Sig 49% / LDS 51% (reset to 50/50 each Dec 31).",
+   "detail": "9Sig 50% / LDS 50% (reset to 50/50 each Dec 31).",
    "fix": ""
   },
   {
@@ -115,28 +122,28 @@
    "group": "Account",
    "name": "No missed days",
    "status": "ok",
-   "detail": "Every close since Oct 16, 2026 is booked (5 days).",
+   "detail": "Every close since Oct 16, 2026 is booked (6 days).",
    "fix": ""
   },
   {
    "group": "Account",
    "name": "Preview matched the booked close",
    "status": "ok",
-   "detail": "2026-10-22: preview orders matched the booked trades (0 tickers).",
+   "detail": "2026-10-23: preview orders matched the booked trades (0 tickers).",
    "fix": ""
   },
   {
    "group": "Guardrails",
    "name": "Drawdown",
    "status": "ok",
-   "detail": "-4.4% from the high. Drops to -40% are normal for this strategy.",
+   "detail": "-5.3% from the high. Drops to -40% are normal for this strategy.",
    "fix": ""
   },
   {
    "group": "Guardrails",
    "name": "Last 12 months",
    "status": "info",
-   "detail": "Checked after 12 months live (now 6 days, -0.7% since the start).",
+   "detail": "Checked after 12 months live (now 7 days, -1.7% since the start).",
    "fix": ""
   },
   {
@@ -211,6 +218,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-23T16:21:00-04:00",
+   "overall": "ok",
+   "fails": 0,
+   "warns": 0
+  },
   {
    "t": "2026-10-23T15:57:10-04:00",
    "overall": "ok",
@@ -561,12 +574,6 @@
   },
   {
    "t": "2026-10-21T16:25:31-04:00",
-   "overall": "warn",
-   "fails": 0,
-   "warns": 1
-  },
-  {
-   "t": "2026-10-21T16:21:00-04:00",
    "overall": "warn",
    "fails": 0,
    "warns": 1
