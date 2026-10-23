@@ -41,8 +41,11 @@ DEFAULTS = dict(growth=("TQQQ",), derisk_asset=None, def_trend=False, def_sma=20
                 nine_dual_cap=None, def_dual=False, lds_crash=None, dd_boost=None, swap_fomc_dual=False, q_gate=None, q_sell_skip_dual=False,
                 mom_skip1=False, dip_lev=None,
                 cap_sig=None, boost_sig=None, split_sig=None, tlt_carry=False, overlay_bear=False, chand=None, trend_params=None,
-                res_swap=None, split_dyn=None)
+                res_swap=None, split_dyn=None,
+                lds_sig=None, swap_sig=None, dip_sig=None, tom_sig=None, vt_sig=None, res_sig=None, qsell_sig=None, swap_asset_sig=None,
+                vol_ens=None, overlay_vix=None)
 LDS_MEM = {}      # per-run memory for hysteresis (reset by bt.run)
+ENSF = {}
 LEV_OF = {t: (a, L) for (a, L), t in ETF.items()}
 
 def p(k): return P.get(k, DEFAULTS[k])
@@ -86,6 +89,7 @@ def vol_switch(px, adj, date):
             x = np.log(h / l).dropna()
             if len(x) >= 10: v = float(3 * math.sqrt((x ** 2).mean() / (4 * math.log(2)) * 252))
         if p("vol_fast") and len(r) >= 10: v = max(v, float(r.iloc[-10:].std(ddof=1) * math.sqrt(252)))
+        if p("vol_ens") and len(r) >= max(p("vol_ens")): v = float(np.mean([r.iloc[-n:].std(ddof=1) for n in p("vol_ens")]) * math.sqrt(252))
     tgt = p("vol_target_winter") if p("vol_target_winter") and date.month in (11, 12, 1, 2, 3, 4) else P["vol_target"]
     if p("vol_target_trend"):
         q = adj["QQQ"].dropna(); tgt = p("vol_target_trend")[0] if float(q.iloc[-1]) > float(q.iloc[-200:].mean()) else p("vol_target_trend")[1]
@@ -297,6 +301,9 @@ def _sig(spec, adj, st, date, cal, tomorrow):
         x = _col(adj, "IRXL"); return None if x is None or len(x) < 130 else float(x.iloc[-1]) - float(x.iloc[-127]) < a[0]
     if name == "sb_corr":
         r = adj[["SPY", "TLT"]].dropna().pct_change().iloc[-60:]; return bool(float(r.corr().iloc[0, 1]) < 0) if len(r) >= 60 else None
+    if name == "sbc":       # stock/bond correlation over lb days below th
+        lb, th = a; r = adj[["SPY", "TLT"]].dropna().pct_change().iloc[-lb:]
+        return bool(float(r.corr().iloc[0, 1]) < th) if len(r) >= lb else None
     if name == "breadth":
         cols = [c for c in ("SPY", "QQQ", "IWM", "DIA", "EFA", "EEM", "XLK", "XLU", "XLE", "XLV", "XLF", "VNQ") if c in adj]
         res = [above(adj[c].dropna()) for c in cols]; res = [x for x in res if x is not None]
@@ -425,6 +432,10 @@ def lds_exposures(adj):
             else:
                 n_, th = tp; ch = abs(float(s.iloc[-1] - s.iloc[-n_])); path = float(s.diff().abs().iloc[-n_:].sum())
                 up = up and float(s.iloc[-30:].mean()) > sma and (ch / path if path else 0) > th
+        elif p("core_trend") == "ens":
+            fr = float(np.mean([float(s.iloc[-1]) > float(s.iloc[-sl:].mean()) and float(s.iloc[-fa:].mean()) > float(s.iloc[-sl:].mean())
+                                for sl in (150, 210, 270) for fa in (20, 30, 40)]))
+            up = fr > 0 if p("trend_params") == "frac" else fr >= 0.5; ENSF[a] = fr
         elif p("core_trend") == "dual":
             f_ = float(s.iloc[-p("dual_fast"):].ewm(span=p("dual_fast")).mean().iloc[-1]) if p("dual_ema") else float(s.iloc[-p("dual_fast"):].mean())
             if p("dual_band"):
@@ -456,8 +467,11 @@ def lds_exposures(adj):
             rc = w * (C @ w); w = w * (rc.mean() / np.maximum(rc, 1e-12)) ** 0.5; w = w / w.sum()
         core = dict(zip(ks, w))
     core = scale(core, P["lds_vol_target"])
+    if p("core_trend") == "ens" and p("trend_params") == "frac": core = {a: e * ENSF.get(a, 1.0) for a, e in core.items()}
     ov = {}
+    vix_hi = bool(p("overlay_vix")) and "VIXLVL" in adj and float(adj["VIXLVL"].iloc[-1]) > p("overlay_vix")
     for a in A:
+        if vix_hi: break
         bm = diag[a]["mom_blend"]
         if np.isnan(bm): continue
         if bm <= 0 and (p("overlay_long_only") or not any(L < 0 for L in LEVS[a])): continue
@@ -504,9 +518,19 @@ def lds_review_due(cal, d):
         i = cal._pos.get(d); return d.day >= 15 and (i is None or i == 0 or cal.days[i - 1].day < 15 or cal.days[i - 1].month != d.month)
     raise ValueError(f)
 
+SIG_HOOKS = ("lds_sig", "swap_sig", "dip_sig", "tom_sig", "vt_sig", "res_sig", "qsell_sig", "swap_asset_sig")
+def _hook_spec(k):
+    v = p(k)
+    if not v: return None
+    return v if k in ("swap_sig", "dip_sig", "tom_sig", "qsell_sig") else v[0]
+
 def step(st, date, adj, close, cal, divs=None, splits=None):
     nine, lds = st["nine"], st["lds"]
     ev = []
+    tm_ = cal.next_day(date)
+    for k_ in SIG_HOOKS:                      # evaluate every hooked signal daily so stateful ones keep their history
+        if _hook_spec(k_): sig(_hook_spec(k_), adj, st, date, cal, tm_)
+    hk = lambda k_: sig(_hook_spec(k_), adj, st, date, cal, tm_) if _hook_spec(k_) else None
     growth = [nine.get("gasset") or p("growth")[0]] if p("growth_rot") else list(p("growth")); deff = list(P["defensive"])
     prev = st["prev_close"]
     if p("cash_yield") and prev:
@@ -535,6 +559,7 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
         if diff > 0 and p("q_gate") == "skip_buys" and not qd_: diff = 0.0
         if diff > 0 and p("q_gate") == "half_buys" and not qd_: diff *= 0.5
         if diff < 0 and p("q_sell_skip_dual") and qd_: diff = 0.0
+        if diff < 0 and hk("qsell_sig") is True: diff = 0.0
         if diff < 0 and nine["skips"] > 0: nine["skips"] -= 1
         elif diff < 0 and p("nine_buy_only"): pass
         elif diff < 0: nine["S"] += diff; nine["B"] -= diff
@@ -611,6 +636,9 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
         vt = (1 + adj[growth].pct_change().fillna(0).mean(axis=1)).cumprod()
     else:
         vt = adj[growth[0]].dropna()
+    if p("vt_sig"):
+        P.setdefault("_vt0", P["vol_target"]); ok_ = hk("vt_sig")
+        P["vol_target"] = P["_vt0"] if ok_ is None else (p("vt_sig")[1] if ok_ else p("vt_sig")[2])
     raw, v20 = vol_switch(vt, adj, date)
     if p("cppi") and v20 == v20 and v20 > 0:
         eqv = [e["value"] for e in st["equity"][-750:]]
@@ -631,6 +659,7 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
     bull = _bullish(st, cal, date, tomorrow, adj)
     uptrend = float(qqq.iloc[-1]) > float(qqq.iloc[-200:].mean())
     if p("tom_trend") and not uptrend: tom = False
+    if hk("tom_sig") is False: tom = False
     full = tom or (p("swap_9sig") and bull)
     if p("santa"):
         i_ = cal._pos.get(tomorrow)
@@ -648,6 +677,7 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
         if p("nine_dip_exit") is None: on = dip_signal(adj, p("dip_kind"), p("nine_dip"))
         elif not on and uptrend and r2 < p("nine_dip"): on = True
         elif on and r2 > p("nine_dip_exit"): on = False
+        if hk("dip_sig") is False: on = False
         nine["dip_on"] = on; full = full or on
     if p("boost_sig") and sig(p("boost_sig"), adj, st, date, cal, tomorrow) is True: full = True
     if p("chand") and sig(("chand",) + tuple(p("chand")), adj, st, date, cal, tomorrow) is False: base = 0.0; full = False
@@ -669,6 +699,7 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
         iv = {t: 1 / max(float(adj[t].pct_change().iloc[-63:].std()), 1e-6) for t in set(def_new)}; tot_ = sum(iv.values())
         new_w = {t: round(v / tot_, 2) for t, v in iv.items()}
         if new_w != nine.get("def_w") and (cal.is_month_end(date) or not nine.get("def_w")): nine["def_w"] = new_w; nine_trade = True
+    if p("res_sig") and hk("res_sig") is False: def_new = list(p("res_sig")[1])
     if p("res_swap") and bull:
         ra, rf_ = p("res_swap"); def_new = [ra] if rf_ >= 1 else list(def_new) + [ra] * len(def_new)
     def_changed = (nine.get("def_hold") or deff) != def_new
@@ -687,21 +718,24 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
         nine["initialized"] = True
     # --- LDS: bullish-session swap (Fed day and optional calendar/dip days)
     ex, diag = lds_exposures(adj)
-    kmax = 1 if (p("lds_riskoff") and roff) else 3
+    loff = (p("lds_riskoff") and roff) or hk("lds_sig") is False
+    lcash = loff and p("lds_sig") and p("lds_sig")[1] == "cash"
+    kmax = 1 if loff else 3
+    def caps_for(ex_, k_): return {"BIL": 1.0} if lcash else implement(ex_, k_)
     def lds_targets(caps, vl):
         tg = {t: c * vl for t, c in caps.items()}
         if p("ndx_cap") is not None and tg.get("TQQQ", 0) > 0:
             room = max(0.0, p("ndx_cap") * total_value(st, close) - st["sleeves"]["9SIG"]["holdings"].get("TQQQ", 0) * close["TQQQ"])
             if tg["TQQQ"] > room: tg["UPRO"] = tg.get("UPRO", 0) + tg["TQQQ"] - room; tg["TQQQ"] = room
         return tg
-    if p("lds_riskoff") and not (lds.get("swap") or {}).get("active") and st["last_date"] and bool(lds.get("delev")) != (kmax == 1):
+    if (p("lds_riskoff") or p("lds_sig")) and not (lds.get("swap") or {}).get("active") and st["last_date"] and bool(lds.get("delev")) != (kmax == 1):
         vl = sleeve_value(st, "LDS", close)
-        set_targets(st, "LDS", lds_targets(implement(ex, kmax), vl), close, date, "LDS risk-off" if kmax == 1 else "LDS risk back on")
+        set_targets(st, "LDS", lds_targets(caps_for(ex, kmax), vl), close, date, "LDS risk-off" if kmax == 1 else "LDS risk back on")
         lds["delev"] = kmax == 1
     sw = lds.get("swap") or {}
     swapped_back = False
     if sw.get("active") and not bull:
-        caps = implement(ex, kmax); vl = sleeve_value(st, "LDS", close)
+        caps = caps_for(ex, kmax); vl = sleeve_value(st, "LDS", close)
         set_targets(st, "LDS", lds_targets(caps, vl), close, date, "Swap ends: LDS positions restored")
         lds["exposures"] = ex; lds["swap"] = dict(active=False); swapped_back = True
     exit_due = False
@@ -712,7 +746,7 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
         vl = sleeve_value(st, "LDS", close); set_targets(st, "LDS", {"BIL": vl}, close, date, "LDS crash cut"); lds["crash_out"] = True
     if lds.get("crash_out") and lds_review_due(cal, date): lds["crash_out"] = False
     if (lds_review_due(cal, date) or lds_force or exit_due) and not swapped_back and not sw.get("active") and not lds.get("crash_out"):
-        caps = implement(ex, kmax); vl = sleeve_value(st, "LDS", close)
+        caps = caps_for(ex, kmax); vl = sleeve_value(st, "LDS", close)
         tg = lds_targets(caps, vl)
         cur = {t: sh * close[t] for t, sh in st["sleeves"]["LDS"]["holdings"].items()}
         turn = sum(abs(tg.get(t, 0) - cur.get(t, 0)) for t in set(tg) | set(cur))
@@ -721,7 +755,9 @@ def step(st, date, adj, close, cal, divs=None, splits=None):
     if bull and not (lds.get("swap") or {}).get("active") and not (p("lds_riskoff") and roff):
         vl = sleeve_value(st, "LDS", close)
         f = p("swap_frac"); tg = defaultdict(float)
-        for t, w in p("swap_asset"): tg[t] += w * vl * f
+        sa_ = p("swap_asset")
+        if p("swap_asset_sig"): sa_ = p("swap_asset_sig")[1] if hk("swap_asset_sig") is not False else p("swap_asset_sig")[2]
+        for t, w in sa_: tg[t] += w * vl * f
         if f < 1:
             for t, sh in st["sleeves"]["LDS"]["holdings"].items(): tg[t] += sh * close[t] * (1 - f)
         set_targets(st, "LDS", dict(tg), close, date, "Swap: LDS into TQQQ")
@@ -751,6 +787,7 @@ def _bullish(st, cal, date, tomorrow, adj):
     if p("swap_fomc") and P["fomc_swap"] and cal.is_fomc_window(tomorrow):
         q = adj["QQQ"].dropna(); s_ = adj["SPY"].dropna()
         if p("swap_fomc_dual") and not (float(s_.iloc[-30:].mean()) > float(s_.iloc[-210:].mean())): return False
+        if p("swap_sig") and sig(p("swap_sig"), adj, st, date, cal, tomorrow) is False: return False
         if not p("swap_fomc_trend") or float(q.iloc[-1]) > float(q.iloc[-200:].mean()): return True
     if p("swap_tom") and cal.is_tom(tomorrow): return True
     if p("swap_preholiday") and cal.is_pre_holiday(tomorrow): return True
