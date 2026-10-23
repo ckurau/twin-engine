@@ -78,7 +78,7 @@ footer{font-size:13.5px;color:var(--fg-3)}
   <header style="display:flex;flex-direction:column;gap:10px">
     <div class="eyebrow">Twin Engine · research · updated Oct 22, 2026</div>
     <h1>Twin Engine Idea Lab III</h1>
-    <p class="fg2">About 1,080 ideas tested here (1,170 across all labs) with the same code that runs the paper account, $20k start, 0.05% cost per fill. Newest first: round 13 (drawbacks), round 12, round 11, round 10 (famous traders), round 9, round 8 (v1.7), tech reliance, then the v1.6 work, then the original 155 ideas that led to v1.5.</p>
+    <p class="fg2">About 1,080 ideas tested here (1,170 across all labs) with the same code that runs the paper account, $20k start, 0.05% cost per fill. Newest first: round 14 (stagflation), round 13 (drawbacks), round 12, round 11, round 10 (famous traders), round 9, round 8 (v1.7), tech reliance, then the v1.6 work, then the original 155 ideas that led to v1.5.</p>
   </header>
 
   <section>
@@ -100,6 +100,20 @@ footer{font-size:13.5px;color:var(--fg-3)}
       </tbody></table></div>
       <p class="fg2">Caveats: the gain comes after 2013 (2000–12: −0.7 pt), and 30 days was the best of six fast averages (all helped from 2010). Rejected: Santa Claus rally (Dec 22 start +0.8 pt, Dec 20 start zero: one lucky year), fear premium (1.5x works, 1.4x gives a −54% drawdown), 60/40 on top (+2% money for double the >50%-drop odds), and the rest of round 8, all in the table below.</p>
     </div>
+  </section>
+
+  <section>
+    <h2>Stagflation: the 1970s rebuilt (round 14, Oct 23)</h2>
+    <p class="fg2">The strategy was run through a rebuilt 1972–1991 using the Nasdaq Composite, the S&amp;P 500, Treasuries priced from yields (checked against a real long-bond fund 1986–91: 9.3% vs 9.9% a year, correlation 0.82), T-bills and monthly gold. In 1972–82 stocks earned about 4% a year, long bonds 2.7%, T-bills 8.4% and gold 22%. v1.7 still beat the S&amp;P (18.3% vs 11.1% a year for 1972–91) but fell <b>74%</b> in 1973–74. The Nasdaq slid about 60% slowly, with low daily volatility, so 9Sig's volatility switch never fired and the quarterly rule kept buying TQQQ on the way down (9Sig sleeve −87%). Bonds and the reserve were not the problem.</p>
+    <div class="tbl"><table><thead><tr><th>Idea (CAGR / max DD)</th><th class="n">2000–26</th><th class="n">2010–26</th><th class="n">1988–99</th><th class="n">1972–91</th><th class="n">1973–74 loss</th></tr></thead><tbody>
+      <tr><td>v1.7</td><td class="n">38.1 / −36</td><td class="n">39.1 / −33</td><td class="n">34.1 / −47</td><td class="n">18.3 / −74</td><td class="n">−54%</td></tr>
+      <tr class="hl"><td>TQQQ max 50% when QQQ below its 200-day average</td><td class="n">36.6 / −36</td><td class="n">39.2 / −33</td><td class="n">33.2 / −41</td><td class="n">23.3 / −65</td><td class="n">−37%</td></tr>
+      <tr><td>TQQQ max 50% when QQQ dual trend is down</td><td class="n">37.1 / −36</td><td class="n">38.8 / −33</td><td class="n">31.8 / −42</td><td class="n">21.6 / −65</td><td class="n">−36%</td></tr>
+      <tr><td>TQQQ max 0% when QQQ below its 200-day average</td><td class="n">34.2 / −36</td><td class="n">37.0 / −33</td><td class="n">31.2 / −33</td><td class="n">24.9 / −51</td><td class="n">−9%</td></tr>
+      <tr><td>TQQQ max 50% in downtrend + LDS drops TLT when yields rise</td><td class="n">34.3 / −41</td><td class="n">37.9 / −33</td><td class="n">31.5 / −43</td><td class="n">24.8 / −51</td><td class="n">−9%</td></tr>
+      <tr><td>Reserve gold + T-bills (always, or when yields rise)</td><td class="n">38.0 / −37</td><td class="n">39.1 / −33</td><td class="n">34.0 / −47</td><td class="n">18.1 / −74</td><td class="n">−54%</td></tr>
+    </tbody></table></div>
+    <p class="fg2">Inflation-style fixes (gold/T-bill reserve, dropping bonds when yields rise, a lower volatility target) did nothing for the 1970s. What worked was a trend cap on 9Sig's TQQQ: insurance against slow bear markets that costs about 1–4 points a year in the modern backtests. The 1970s test is an approximation: the Nasdaq Composite is less volatile than the Nasdaq-100, gold is filled in from monthly prices, and it is one episode.</p>
   </section>
 
   <section>

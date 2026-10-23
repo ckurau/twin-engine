@@ -64,6 +64,7 @@ def run(overrides=None, start="2000-01-03", end=None, capital=20000.0, slippage_
         s = stats(eq, tdays); s["equity"] = eq; s["n_trades"] = len(st["trades"])
         s["expo"] = pd.DataFrame([e.get("x", {}) for e in st["equity"]], index=eq.index).fillna(0.0)
         s["trades"] = st["trades"]
+        s["sleeves"] = pd.DataFrame([dict(nine=e.get("nine"), lds=e.get("lds")) for e in st["equity"]], index=eq.index)
         return s
     finally:
         for k, v in saved.items(): setattr(te, k, v)
