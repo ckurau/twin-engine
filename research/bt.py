@@ -38,7 +38,7 @@ def stats(eq: pd.Series, trade_days=None):
     if trade_days is not None: out["trade_days_yr"] = trade_days / yrs
     return out
 
-def run(overrides=None, start="2000-01-03", end=None, capital=20000.0, slippage_bps=5.0, panel=None, hooks=None, lab=True):
+def run(overrides=None, start="2000-01-03", end=None, capital=20000.0, slippage_bps=5.0, panel=None, hooks=None, lab=True, lag=False):
     px = PANEL if panel is None else panel
     te.P.clear(); te.P.update(_BASE_P); te.P.update(dict(slippage_bps=slippage_bps, min_order=0.0, fractional=True))
     te_lab.LDS_MEM.clear(); te_lab.ENSF.clear()
@@ -57,7 +57,8 @@ def run(overrides=None, start="2000-01-03", end=None, capital=20000.0, slippage_
         for i in range(i0, i1):
             d = idx[i]
             close = dict(zip(cols, vals[i]))
-            stepf(st, d, A.iloc[max(0, i - win):i + 1], close, cal)
+            if lag: close = dict(zip(cols, vals[i])); stepf(st, d, A.iloc[max(0, i - 1 - win):i], close, cal) if i > i0 else stepf(st, d, A.iloc[max(0, i - win):i + 1], close, cal)
+            else: stepf(st, d, A.iloc[max(0, i - win):i + 1], close, cal)
         eq = pd.Series([e["value"] for e in st["equity"]], index=pd.to_datetime([e["date"] for e in st["equity"]]))
         tdays = len({t["date"] for t in st["trades"]})
         s = stats(eq, tdays); s["equity"] = eq; s["n_trades"] = len(st["trades"])
