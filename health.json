@@ -1,13 +1,13 @@
 {
- "generated": "2026-10-22T19:24:39-04:00",
- "generated_et": "Thu Oct 22, 7:24 PM ET",
- "overall": "ok",
+ "generated": "2026-10-22T20:01:55-04:00",
+ "generated_et": "Thu Oct 22, 8:01 PM ET",
+ "overall": "warn",
  "counts": {
   "fail": 0,
   "fixing": 0,
-  "warn": 0,
+  "warn": 1,
   "pending": 0,
-  "ok": 21,
+  "ok": 20,
   "info": 6
  },
  "version": "1.7.0",
@@ -58,9 +58,9 @@
   {
    "group": "Data",
    "name": "Price data (Yahoo Finance)",
-   "status": "ok",
-   "detail": "All 22 tickers have the Oct 22 close.",
-   "fix": ""
+   "status": "warn",
+   "detail": "Yahoo doesn't have the Oct 22 close yet (latest Oct 21, 4 h after that close).",
+   "fix": "Usually Yahoo catches up within hours. If this is still failing by the next morning, ask Claude."
   },
   {
    "group": "Data",
@@ -204,6 +204,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-22T20:01:55-04:00",
+   "overall": "warn",
+   "fails": 0,
+   "warns": 1
+  },
   {
    "t": "2026-10-22T19:24:39-04:00",
    "overall": "ok",
@@ -554,12 +560,6 @@
   },
   {
    "t": "2026-10-21T00:13:06-04:00",
-   "overall": "ok",
-   "fails": 0,
-   "warns": 0
-  },
-  {
-   "t": "2026-10-21T00:12:38-04:00",
    "overall": "ok",
    "fails": 0,
    "warns": 0
