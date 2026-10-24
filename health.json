@@ -1,13 +1,13 @@
 {
- "generated": "2026-10-23T19:53:37-04:00",
- "generated_et": "Fri Oct 23, 7:53 PM ET",
+ "generated": "2026-10-23T21:04:12-04:00",
+ "generated_et": "Fri Oct 23, 9:04 PM ET",
  "overall": "warn",
  "counts": {
   "fail": 0,
   "fixing": 0,
-  "warn": 1,
+  "warn": 3,
   "pending": 0,
-  "ok": 20,
+  "ok": 19,
   "info": 7
  },
  "version": "1.7.0",
@@ -58,9 +58,16 @@
   {
    "group": "Data",
    "name": "Price data (Yahoo Finance)",
-   "status": "ok",
-   "detail": "All 22 tickers have the Oct 23 close.",
-   "fix": ""
+   "status": "warn",
+   "detail": "No Oct 23 close yet for: GLD, QQQ, SOXL, SPY, SQQQ, TLT, TQQQ.",
+   "fix": "Usually fixes itself within hours; if it persists into the next session, ask Claude."
+  },
+  {
+   "group": "Data",
+   "name": "Backup price source used",
+   "status": "warn",
+   "detail": "Filled from the Nasdaq backup (Yahoo was missing them): GLL Oct 23, PSQ Oct 23, QID Oct 23, QLD Oct 23, SDS Oct 23, SH Oct 23, SPXU Oct 23, SSO Oct 23, TBF Oct 23, TBT Oct 23, TMF Oct 23, TMV Oct 23 ...",
+   "fix": "Nothing to do: the backup filled the gap. If this shows every day, Yahoo may have changed; ask Claude."
   },
   {
    "group": "Data",
@@ -211,6 +218,12 @@
   }
  ],
  "history": [
+  {
+   "t": "2026-10-23T21:04:12-04:00",
+   "overall": "warn",
+   "fails": 0,
+   "warns": 3
+  },
   {
    "t": "2026-10-23T19:53:37-04:00",
    "overall": "warn",
@@ -564,12 +577,6 @@
    "overall": "warn",
    "fails": 0,
    "warns": 1
-  },
-  {
-   "t": "2026-10-21T19:21:50-04:00",
-   "overall": "ok",
-   "fails": 0,
-   "warns": 0
   }
  ],
  "remediation": {
